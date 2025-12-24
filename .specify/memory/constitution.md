@@ -1,50 +1,67 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+同步影响报告
+- 版本变更: 0.1.0 → 0.1.1
+- 修改的原则: 投资级分析 → 投资级分析（中文化表述）; 仅钱包接入 → 仅钱包接入（中文化表述）;
+  非托管与明确授权 → 非托管与明确授权（中文化表述）; 渠道一致性 → 渠道一致性（中文化表述）;
+  零售风险与清晰表达 → 零售风险与清晰表达（中文化表述）
+- 新增章节: 无
+- 移除章节: 无
+- 模板更新: ✅ .specify/templates/plan-template.md; ✅ .specify/templates/spec-template.md;
+  ✅ .specify/templates/tasks-template.md; ⚠ .specify/templates/commands/*.md（未发现）
+- 跟进 TODO: TODO(RATIFICATION_DATE): 原始通过日期未知
+-->
+# CopyTrading 宪章
 
-## Core Principles
+## 核心原则
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### 投资级分析
+所有展示的绩效指标（回报率、Sharpe、PnL、回撤、时间窗口）必须基于 Hyperliquid
+vault 数据计算，并明确公式、数据来源与计算窗口。任何衍生的排名或评分必须可用
+相同输入复现。
+理由: 只有结果透明且可解释，用户才会信任产品。
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### 仅钱包接入
+用户访问必须仅通过 Web3 钱包连接；系统不得要求用户名、密码或托管账户。仅保存会话
+与分析所需的最小钱包元数据，绝不存储私钥。
+理由: 面向非专业投资者时，流程必须足够简单且安全。
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### 非托管与明确授权
+系统必须仅用于分析与展示；任何可能导致资金转移的操作都必须由用户在链上明确签名，
+且不得在未确认情况下自动执行。
+理由: 避免托管风险，并保证用户完全掌控交易。
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### 渠道一致性
+Web UI 与 Telegram 可调用的 API 必须提供相同的核心数据、筛选条件与排名逻辑，并保持
+一致的响应结构与版本化接口。
+理由: 用户在不同渠道不应获得不同的投资信号。
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### 零售风险与清晰表达
+产品必须提供清晰的风险披露，避免营销式保证，并将指标定位为信息参考而非投资建议。
+所有文案必须让非专业投资者可理解。
+理由: 降低用户误解风险或过度信任排名的可能性。
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## 产品范围与约束
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- 聚焦 Hyperliquid vault 分析，包括回报率、Sharpe、PnL 与回撤。
+- 必须同时提供 Web 端体验与 Telegram 可调用 API。
+- 钱包连接是唯一身份方式，不提供账户体系。
+- 系统不托管资金，也不会在未签名的情况下执行交易。
+- 优先保证非专业投资者理解清晰，而非堆叠高级交易功能。
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## 工程与质量流程
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+- 维护指标规范文档，包含公式、数据来源与时间窗口。
+- 为 Web 与 Telegram 提供接口契约，破坏性变更必须版本化。
+- 为指标计算与关键 API 响应添加自动化测试。
+- 结构化记录数据管线错误，避免记录 PII。
+- 所有发布必须进行宪章合规检查。
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+## 治理
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- 当与其他规范冲突时，本宪章优先。
+- 修订必须记录变更内容、理由与迁移说明。
+- 版本遵循语义化: MAJOR 为移除/重定义，MINOR 为新增，PATCH 为澄清。
+- 评审必须检查所有核心原则与产品范围约束的合规性。
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 0.1.1 | **Ratified**: TODO(RATIFICATION_DATE): 原始通过日期未知
+| **Last Amended**: 2025-12-24

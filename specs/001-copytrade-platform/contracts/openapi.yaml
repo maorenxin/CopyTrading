@@ -1,0 +1,392 @@
+openapi: 3.0.3
+info:
+  title: 跟单平台 API
+  version: 0.1.0
+  description: Web 与 Telegram 共用的核心数据与跟单接口契约。
+servers:
+  - url: https://api.example.com
+paths:
+  /traders:
+    get:
+      summary: 获取交易员列表
+      parameters:
+        - in: query
+          name: view
+          schema:
+            type: string
+            enum: [card, table]
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [sharpe, all_time_return, max_drawdown, win_rate]
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+        - in: query
+          name: lang
+          schema:
+            type: string
+            enum: [zh, en]
+      responses:
+        '200':
+          description: 交易员列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraderList'
+  /traders/{traderId}:
+    get:
+      summary: 获取交易员详情
+      parameters:
+        - in: path
+          name: traderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 交易员详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraderDetail'
+  /traders/{traderId}/metrics:
+    get:
+      summary: 获取交易员指标
+      parameters:
+        - in: path
+          name: traderId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: window
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, all]
+      responses:
+        '200':
+          description: 指标数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceMetric'
+  /traders/{traderId}/trades:
+    get:
+      summary: 获取交易历史
+      parameters:
+        - in: path
+          name: traderId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 交易历史列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeHistoryList'
+  /traders/{traderId}/equity:
+    get:
+      summary: 获取净值走势与 BTC 对比
+      parameters:
+        - in: path
+          name: traderId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: window
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, all]
+      responses:
+        '200':
+          description: 净值与 BTC 对比曲线
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EquitySeries'
+  /copy-orders:
+    post:
+      summary: 创建跟单订单
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyOrderCreate'
+      responses:
+        '200':
+          description: 跟单订单创建结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyOrder'
+  /copy-orders/{orderId}:
+    get:
+      summary: 获取跟单订单详情
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 跟单订单详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyOrder'
+  /copy-orders/{orderId}/cancel:
+    post:
+      summary: 撤单
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 撤单结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyOrder'
+  /portfolio:
+    get:
+      summary: 获取用户资产与跟单概览
+      parameters:
+        - in: query
+          name: wallet
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 资产概览
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioSummary'
+  /telegram/webhook:
+    post:
+      summary: Telegram 更新回调入口
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramUpdate'
+      responses:
+        '200':
+          description: 回调处理成功
+  /telegram/bind:
+    post:
+      summary: 生成绑定深链
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramBindRequest'
+      responses:
+        '200':
+          description: 返回深链与绑定会话
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramBindResponse'
+  /telegram/bind/confirm:
+    post:
+      summary: 确认绑定完成
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramBindConfirm'
+      responses:
+        '200':
+          description: 绑定确认结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelegramBindResponse'
+
+components:
+  schemas:
+    TraderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraderSummary'
+    TraderSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+        display_name:
+          type: string
+        metrics:
+          $ref: '#/components/schemas/PerformanceMetric'
+    TraderDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+        display_name:
+          type: string
+        metrics:
+          $ref: '#/components/schemas/PerformanceMetric'
+        risk_notice:
+          type: string
+    PerformanceMetric:
+      type: object
+      properties:
+        window:
+          type: string
+          enum: [7d, 30d, 90d, all]
+        return_rate:
+          type: number
+        sharpe:
+          type: number
+        win_rate:
+          type: number
+        max_drawdown:
+          type: number
+        pnl:
+          type: number
+    TradeHistoryList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeHistory'
+        next_cursor:
+          type: string
+    TradeHistory:
+      type: object
+      properties:
+        tx_hash:
+          type: string
+        side:
+          type: string
+        size:
+          type: number
+        price:
+          type: number
+        pnl:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+    EquitySeries:
+      type: object
+      properties:
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/EquityPoint'
+    EquityPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        vault_equity:
+          type: number
+        btc_equity:
+          type: number
+    CopyOrderCreate:
+      type: object
+      required: [wallet_address, trader_id, amount_usdc]
+      properties:
+        wallet_address:
+          type: string
+        trader_id:
+          type: string
+        amount_usdc:
+          type: number
+    CopyOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        wallet_address:
+          type: string
+        trader_id:
+          type: string
+        amount_usdc:
+          type: number
+        fee_usdc:
+          type: number
+        status:
+          type: string
+          enum: [pending, active, cancelled, failed]
+    PortfolioSummary:
+      type: object
+      properties:
+        wallet_address:
+          type: string
+        total_value:
+          type: number
+        active_orders:
+          type: integer
+        pnl:
+          type: number
+    TelegramUpdate:
+      type: object
+      properties:
+        update_id:
+          type: integer
+        message:
+          type: object
+    TelegramBindRequest:
+      type: object
+      required: [telegram_user_id]
+      properties:
+        telegram_user_id:
+          type: string
+    TelegramBindResponse:
+      type: object
+      properties:
+        bind_id:
+          type: string
+        bind_url:
+          type: string
+        status:
+          type: string
+          enum: [pending, verified]
+    TelegramBindConfirm:
+      type: object
+      required: [bind_id, wallet_address, signature]
+      properties:
+        bind_id:
+          type: string
+        wallet_address:
+          type: string
+        signature:
+          type: string
