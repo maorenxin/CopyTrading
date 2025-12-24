@@ -10,9 +10,10 @@ interface HeaderProps {
   onLanguageChange: (lang: Language) => void;
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
+  web3Mock: boolean;
 }
 
-export function Header({ lang, onLanguageChange, colorMode, onColorModeChange }: HeaderProps) {
+export function Header({ lang, onLanguageChange, colorMode, onColorModeChange, web3Mock }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-[#1A0B2E]/95 backdrop-blur-md border-b border-white/10">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-4">
@@ -32,7 +33,7 @@ export function Header({ lang, onLanguageChange, colorMode, onColorModeChange }:
             <div className="md:hidden">
               <MobilePortfolioSheet lang={lang} />
             </div>
-            <WalletConnect lang={lang} />
+            <WalletConnect lang={lang} web3Mock={web3Mock} />
           </div>
         </div>
       </div>

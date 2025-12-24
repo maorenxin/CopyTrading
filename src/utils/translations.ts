@@ -94,9 +94,14 @@ export const translations = {
         short: 'Short',
 
         // Wallet
-        connectWallet: 'Connect Wallet',
-        disconnect: 'Disconnect',
-        connected: 'Connected',
+    connectWallet: 'Connect Wallet',
+    disconnect: 'Disconnect',
+    connected: 'Connected',
+    connecting: 'Connecting...',
+    installWallet: 'Install Wallet',
+    walletUnavailable: 'Wallet extension not detected',
+    connectFailed: 'Connection failed',
+    retry: 'Retry',
 
         // Time ago
         minutesAgo: 'minutes ago',
@@ -205,9 +210,14 @@ export const translations = {
         short: '做空',
 
         // Wallet
-        connectWallet: '连接钱包',
-        disconnect: '断开连接',
-        connected: '已连接',
+    connectWallet: '连接钱包',
+    disconnect: '断开连接',
+    connected: '已连接',
+    connecting: '连接中...',
+    installWallet: '安装钱包',
+    walletUnavailable: '未检测到钱包扩展',
+    connectFailed: '连接失败',
+    retry: '重试',
 
         // Time ago
         minutesAgo: '分钟前',

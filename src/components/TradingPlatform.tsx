@@ -19,6 +19,7 @@ export function TradingPlatform() {
   const [lang, setLang] = useState<Language>('cn');
   const [colorMode, setColorMode] = useState<ColorMode>('standard');
   const [viewMode, setViewMode] = useState<ViewMode>('table'); // Default to table view, "card" view
+  const [web3Mock, setWeb3Mock] = useState(true);
   const [sortBy, setSortBy] = useState<SortOption>('annualizedReturn');
   const [selectedTrader, setSelectedTrader] = useState<Trader | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -230,7 +231,13 @@ export function TradingPlatform() {
   return (
     <>
       {/* Global Header */}
-      <Header lang={lang} onLanguageChange={setLang} colorMode={colorMode} onColorModeChange={setColorMode} />
+      <Header
+        lang={lang}
+        onLanguageChange={setLang}
+        colorMode={colorMode}
+        onColorModeChange={setColorMode}
+        web3Mock={web3Mock}
+      />
 
       <div className="min-h-screen text-white p-4 md:p-6">
         <div className="max-w-[1800px] mx-auto">

@@ -2319,3 +2319,543 @@
 2025-12-24T08:24:11.491030Z  INFO ToolCall: shell_command {"command":"git fetch --all --prune","workdir":"/Users/mao/code/CopyTradingCodex","sandbox_permissions":"require_escalated","justification":"需要访问远程仓库以获取最新分支列表来计算特性编号。"}
 2025-12-24T08:24:23.140254Z  INFO ToolCall: shell_command {"command":"git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-wallet-connect$'","workdir":"/Users/mao/code/CopyTradingCodex"}
 2025-12-24T08:24:30.149154Z  INFO ToolCall: shell_command {"command":"git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-wallet-connect$'","workdir":"/Users/mao/code/CopyTradingCodex","sandbox_permissions":"require_escalated","justification":"需要访问远程仓库分支列表以确定新功能分支编号。"}
+2025-12-24T08:25:09.873802Z  INFO ToolCall: shell_command {"command":"git branch | grep -E '^[* ]*[0-9]+-wallet-connect$'","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:25:18.151467Z  INFO ToolCall: shell_command {"command":"ls /Users/mao/code/CopyTradingCodex/specs | rg '^[0-9]+-wallet-connect$'","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:25:28.085806Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/create-new-feature.sh --json --number 1 --short-name \"wallet-connect\" \"新增 Web3 钱包连接功能：在 Chrome 里可唤起 OKX/MetaMask 等钱包完成连接与登录；连接后显示钱包地址、支持断开；未连接时提示连接。在当前的 WalletConnect.tsx 中继续完善\"","workdir":"/Users/mao/code/CopyTradingCodex","sandbox_permissions":"require_escalated","justification":"需要创建新特性分支与规格文件用于 speckit.specify 流程。"}
+2025-12-24T08:25:43.769728Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/.specify/templates/spec-template.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:26:11.545821Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/spec.md\n# 功能规格: Web3 钱包连接与登录\n\n**功能分支**: `001-wallet-connect`  \n**创建时间**: 2025-12-24  \n**状态**: 草案  \n**输入**: 用户描述: \"新增 Web3 钱包连接功能：在 Chrome 里可唤起 OKX/MetaMask 等钱包完成连接与登录；连接后显示钱包地址、支持断开；未连接时提示连接。在当前的 WalletConnect.tsx 中继续完善\"\n\n## 用户场景与测试 *(必填)*\n\n### 用户故事 1 - 连接钱包（优先级: P1）\n\n用户在网页中点击“连接钱包”，浏览器唤起 OKX/MetaMask 等钱包扩展完成授权，页面展示已连接状态与钱包地址。\n\n**为何此优先级**: 钱包连接是所有后续操作的前提。\n\n**独立测试**: 用户点击按钮完成一次连接即可验证。\n\n**验收场景**:\n\n1. **假设** 用户未连接钱包，**当** 点击连接按钮并完成授权，**则** 页面展示钱包地址与“已连接”状态。\n2. **假设** 用户取消授权，**当** 返回页面，**则** 仍显示“未连接”并提示重试。\n\n---\n\n### 用户故事 2 - 断开连接（优先级: P2）\n\n用户在已连接状态下点击“断开连接”，页面恢复未连接状态并隐藏地址。\n\n**为何此优先级**: 用户需要可控的退出与隐私管理。\n\n**独立测试**: 已连接用户点击断开即可验证。\n\n**验收场景**:\n\n1. **假设** 用户已连接钱包，**当** 点击断开，**则** 地址被清除且显示“未连接”。\n\n---\n\n### 用户故事 3 - 连接状态提示（优先级: P3）\n\n用户访问页面时若未连接钱包，系统提示可连接；若钱包不可用则提示安装扩展。\n\n**为何此优先级**: 降低用户进入门槛，减少迷惑。\n\n**独立测试**: 在无钱包环境打开页面可看到提示文案。\n\n**验收场景**:\n\n1. **假设** 浏览器未检测到钱包，**当** 用户进入页面，**则** 显示安装提示与说明。\n\n---\n\n### 边界情况\n\n- 当用户拒绝授权时，页面如何提示并允许重试？\n- 当用户切换钱包账户时，页面是否更新地址？\n- 当用户在多个标签页打开页面时，连接状态是否保持一致？\n\n## 需求 *(必填)*\n\n### 功能性需求\n\n- **FR-001**: 系统必须在 Chrome 中唤起钱包扩展完成连接授权。\n- **FR-002**: 系统必须支持 OKX 与 MetaMask 等常见钱包扩展。\n- **FR-003**: 连接成功后必须显示钱包地址与已连接状态。\n- **FR-004**: 用户必须可以主动断开连接，并恢复未连接状态。\n- **FR-005**: 当钱包不可用时，系统必须提示用户安装钱包扩展。\n- **FR-006**: 连接失败或用户拒绝授权时，系统必须提示失败原因并允许重试。\n- **FR-007**: 钱包地址显示必须进行简化（例如 0x1234...abcd）。\n- **FR-008**: 连接状态必须在页面刷新后可恢复（基于本地缓存或钱包状态）。\n\n### 宪章要求 *(必填)*\n\n- 指标必须可复现，并记录公式、数据来源与时间窗口。\n- 钱包连接是唯一认证方式，不得出现用户名/密码账户体系。\n- 任何可能导致资金移动的操作都需要明确的钱包签名，且不得自动执行。\n- Web UI 与 Telegram 可调用 API 必须提供等价的核心数据与筛选。\n- 用户可见文案必须包含风险披露并说明非投资建议。\n\n### 关键实体 *(如涉及数据则必须)*\n\n- **钱包会话**: 当前连接的钱包地址与连接状态。\n\n### 假设与依赖\n\n- 浏览器安装了 OKX 或 MetaMask 扩展。\n- 当前实现聚焦 Web 端，Telegram 端不包含钱包连接。\n\n## 成功标准 *(必填)*\n\n### 可衡量结果\n\n- **SC-001**: 80% 的用户能在 1 分钟内完成一次钱包连接。\n- **SC-002**: 断开连接后 100% 的用户看到未连接状态且地址被清除。\n- **SC-003**: 钱包不可用时，提示文案展示成功率达到 100%。\n- **SC-004**: 连接成功后地址显示正确率达到 99%。\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:26:18.189498Z  INFO ToolCall: shell_command {"command":"mkdir -p /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/checklists","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:26:33.304498Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/checklists/requirements.md\n# 规格质量检查清单: Web3 钱包连接与登录\n\n**用途**: 在进入计划阶段前验证规格完整性与质量\n**创建时间**: 2025-12-24\n**功能规格**: /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/spec.md\n\n## 内容质量\n\n- [x] 不包含实现细节（语言、框架、API）\n- [x] 聚焦用户价值与业务需求\n- [x] 面向非技术干系人表述\n- [x] 所有必填章节已完成\n\n## 需求完整性\n\n- [x] 不存在 [NEEDS CLARIFICATION] 标记\n- [x] 需求可测试且无歧义\n- [x] 成功标准可衡量\n- [x] 成功标准与技术无关（无实现细节）\n- [x] 所有验收场景已定义\n- [x] 边界情况已识别\n- [x] 范围边界清晰\n- [x] 依赖与假设已识别\n\n## 功能就绪度\n\n- [x] 所有功能需求均有清晰验收标准\n- [x] 用户场景覆盖主要流程\n- [x] 功能符合成功标准中的可衡量结果\n- [x] 规格中无实现细节泄露\n\n## 备注\n\n- 当前规格已满足进入 `/speckit.plan` 的条件。\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:27:43.228940Z  INFO spawning ghost snapshot task
+2025-12-24T08:27:43.428000Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/001-wallet-connect/checklists/requirements.md specs/001-wallet-connect/spec.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="94"
+2025-12-24T08:27:43.428019Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:27:51.280571Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/setup-plan.sh --json","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:28:02.533474Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/spec.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:28:14.200758Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/.specify/memory/constitution.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:28:21.205240Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/plan.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:28:44.404111Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/plan.md\n# 实施计划: Web3 钱包连接与登录\n\n**分支**: `001-wallet-connect` | **日期**: 2025-12-24 | **规格**: /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/spec.md\n**输入**: 功能规格来自 `/specs/001-wallet-connect/spec.md`\n\n**说明**: 此模板由 `/speckit.plan` 命令填充。执行流程见 `.specify/templates/commands/plan.md`。\n\n## 概要\n\n在现有前端中完善钱包连接能力：支持 Chrome 里唤起 OKX/MetaMask 等扩展，\n连接成功后展示地址与状态、支持断开连接，并在缺少钱包时提示安装。\n实现聚焦 `WalletConnect.tsx`，并与当前 UI 保持一致的交互与文案。\n\n## 技术背景\n\n**语言/版本**: TypeScript（前端）  \n**主要依赖**: React 18 + Vite（现有前端）、浏览器钱包扩展注入对象  \n**存储**: 本地状态与缓存（仅保存会话与地址，避免敏感数据）  \n**测试**: 手工验收为主（连接/断开/错误提示流程）  \n**目标平台**: Web（Chrome 浏览器扩展钱包）\n**项目类型**: single/web  \n**性能目标**: 连接按钮点击到状态更新不超过 2 秒  \n**约束**: 不存储私钥；只做连接/断开与地址展示  \n**规模/范围**: 仅完善钱包连接 UI 与状态管理\n\n## 宪章检查\n\n*关卡: 必须在 Phase 0 研究前通过；在 Phase 1 设计后复检。*\n\n- 指标透明: 每个指标都有公式、来源与窗口文档。\n- 仅钱包接入: 不得出现用户名/密码或托管账户流程。\n- 非托管授权: 任何资金移动都需要明确钱包签名。\n- 渠道一致性: Web 与 Telegram API 提供相同核心数据与筛选。\n- 零售安全: 文案包含风险披露与非投资建议表述。\n\n## 项目结构\n\n### 文档（本功能）\n\n```text\nspecs/001-wallet-connect/\n├── plan.md              # 本文件（/speckit.plan 输出）\n├── research.md          # Phase 0 输出（/speckit.plan）\n├── data-model.md        # Phase 1 输出（/speckit.plan）\n├── quickstart.md        # Phase 1 输出（/speckit.plan）\n├── contracts/           # Phase 1 输出（/speckit.plan）\n└── tasks.md             # Phase 2 输出（/speckit.tasks - 非 /speckit.plan）\n```\n\n### 源码（仓库根目录）\n\n```text\nsrc/\n├── components/\n│   └── WalletConnect.tsx\n├── utils/\n└── types/\n```\n\n**结构决策**: 在现有 `src/components/WalletConnect.tsx` 中完成实现。\n\n## 复杂度跟踪\n\n> **仅在宪章检查存在必须解释的违规时填写**\n\n| 违规项 | 必要性 | 为什么不能用更简单方案 |\n|-----------|------------|-------------------------------------|\n| 无 | 当前方案满足宪章约束 | N/A |\nEOF"}
+2025-12-24T08:28:58.850723Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/research.md\n# 研究记录: Web3 钱包连接与登录\n\n**日期**: 2025-12-24\n\n## 决策 1: 钱包连接方式\n\n- **Decision**: 使用浏览器扩展注入对象完成连接授权与地址获取。\n- **Rationale**: 满足 Chrome 端 OKX/MetaMask 连接需求，且无需引入额外账户体系。\n- **Alternatives considered**: 独立托管登录（不符合仅钱包接入原则）。\n\n## 决策 2: 连接状态管理\n\n- **Decision**: 连接成功后在前端状态保存地址，并在刷新后尝试恢复。\n- **Rationale**: 提升用户体验，避免每次刷新重新连接。\n- **Alternatives considered**: 不缓存状态（用户体验差）。\n\n## 决策 3: 失败与缺少钱包提示\n\n- **Decision**: 当未检测到钱包扩展时显示安装提示；授权失败时显示重试提示。\n- **Rationale**: 降低用户困惑，提高连接成功率。\n- **Alternatives considered**: 静默失败（不可接受）。\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:29:08.971855Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/data-model.md\n# 数据模型: Web3 钱包连接与登录\n\n**日期**: 2025-12-24\n\n## 实体与字段\n\n### 钱包会话（WalletSession）\n\n- **字段**: wallet_address, status, connected_at\n- **校验**: wallet_address 必须为有效地址格式；status ∈ {disconnected, connected}\n- **关系**: 本功能为前端会话态，不涉及服务端关联\n\n## 状态流转\n\n- disconnected → connected → disconnected\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:29:15.971838Z  INFO ToolCall: shell_command {"command":"mkdir -p /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/contracts","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:29:26.190319Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/contracts/openapi.yaml\nopenapi: 3.0.3\ninfo:\n  title: 钱包连接 API（前端会话）\n  version: 0.1.0\n  description: 本功能不依赖服务端接口，保留占位说明。\npaths: {}\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:29:36.453090Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect/quickstart.md\n# 快速开始: Web3 钱包连接与登录\n\n**日期**: 2025-12-24\n\n## 目标\n\n在本地启动前端并验证钱包连接/断开流程。\n\n## 启动前端\n\n```bash\nnpm install\nnpm run dev\n```\n\n## 验证步骤\n\n1. 在 Chrome 打开页面，点击“连接钱包”。\n2. 选择 OKX/MetaMask 并完成授权。\n3. 观察地址展示与“已连接”状态。\n4. 点击“断开连接”，确认状态恢复为未连接。\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:29:43.778122Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/update-agent-context.sh codex","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:30:36.003430Z  INFO spawning ghost snapshot task
+2025-12-24T08:30:36.186654Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/001-wallet-connect/checklists/requirements.md specs/001-wallet-connect/contracts/openapi.yaml specs/001-wallet-connect/data-model.md specs/001-wallet-connect/plan.md specs/001-wallet-connect/quickstart.md specs/001-wallet-connect/research.md specs/001-wallet-connect/spec.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="96"
+2025-12-24T08:30:36.186686Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:30:46.012972Z  INFO ToolCall: shell_command {"command":"git branch --show-current","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:30:59.809284Z  INFO ToolCall: shell_command {"command":"mv /Users/mao/code/CopyTradingCodex/specs/001-wallet-connect /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:31:07.637375Z  INFO ToolCall: shell_command {"command":"git branch -m 002-wallet-connect","workdir":"/Users/mao/code/CopyTradingCodex","sandbox_permissions":"require_escalated","justification":"需要重命名本地 Git 分支以避免编号冲突。"}
+2025-12-24T08:31:17.326599Z  INFO ToolCall: shell_command {"command":"python - <<'PY'\nfrom pathlib import Path\nroot = Path('/Users/mao/code/CopyTradingCodex/specs/002-wallet-connect')\nfor path in root.rglob('*'):\n    if path.is_file() and path.suffix in {'.md', '.yaml'}:\n        text = path.read_text()\n        text = text.replace('001-wallet-connect', '002-wallet-connect')\n        text = text.replace('/specs/001-wallet-connect', '/specs/002-wallet-connect')\n        path.write_text(text)\nPY","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:31:30.627903Z  INFO ToolCall: shell_command {"command":"rg -n \"001-wallet-connect\" /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:31:38.036541Z  INFO ToolCall: shell_command {"command":"rg -n \"001-wallet-connect\" /Users/mao/code/CopyTradingCodex/AGENTS.md /Users/mao/code/CopyTradingCodex/specs","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:31:46.059379Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/update-agent-context.sh codex","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:32:27.373957Z  INFO spawning ghost snapshot task
+2025-12-24T08:32:27.552234Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="98"
+2025-12-24T08:32:27.552255Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:32:34.432695Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:32:42.952884Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:32:50.607959Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/plan.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:33:05.862766Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/spec.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:33:14.226023Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/data-model.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:33:23.995869Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/contracts/openapi.yaml","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:33:33.432598Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/research.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:34:08.199954Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/tasks.md\n---\n\ndescription: \"功能实施任务清单\"\n---\n\n# 任务: Web3 钱包连接与登录\n\n**输入**: 设计文档来自 `/specs/002-wallet-connect/`\n**前置条件**: plan.md（必需）, spec.md（用户故事必需）, research.md, data-model.md, contracts/\n\n**测试**: 本功能未明确要求测试任务，因此仅安排实现任务。\n\n**组织方式**: 按用户故事分组，确保每个故事可独立实现与测试。\n\n## 格式: `[ID] [P?] [Story] 描述`\n\n- **[P]**: 可并行（不同文件，无依赖）\n- **[Story]**: 任务所属用户故事（例如 US1, US2, US3）\n- 描述中必须包含具体文件路径\n\n## 路径约定\n\n- **Web 应用**: `src/`\n\n## Phase 1: 基础设置（共享基础设施）\n\n**目的**: 项目初始化与基本结构\n\n- [ ] T001 创建钱包会话类型定义于 `src/types/wallet.ts`\n- [ ] T002 创建钱包连接工具函数于 `src/utils/wallet.ts`\n\n---\n\n## Phase 2: 基础能力（阻塞性前置）\n\n**目的**: 核心基础设施，必须完成后才能开始任何用户故事\n\n**⚠️ 关键**: 在此阶段完成前，不允许进入用户故事开发\n\n- [ ] T003 在 `src/components/WalletConnect.tsx` 中接入钱包检测与状态管理\n- [ ] T004 统一地址格式化工具于 `src/utils/formatWalletAddress.ts`\n\n**检查点**: 基础能力完成 - 用户故事可并行推进\n\n---\n\n## Phase 3: 用户故事 1 - 连接钱包（优先级: P1）🎯 MVP\n\n**目标**: 完成 Chrome 钱包扩展连接与授权，展示地址与连接状态\n\n**独立测试**: 点击连接按钮完成授权，页面显示地址与已连接状态\n\n### 用户故事 1 的实现\n\n- [ ] T005 [US1] 实现连接按钮与授权流程于 `src/components/WalletConnect.tsx`\n- [ ] T006 [US1] 展示连接成功状态与地址于 `src/components/WalletConnect.tsx`\n\n**检查点**: 用户故事 1 可独立完成并验证\n\n---\n\n## Phase 4: 用户故事 2 - 断开连接（优先级: P2）\n\n**目标**: 支持用户断开连接并清除地址\n\n**独立测试**: 已连接用户点击断开，页面恢复未连接状态\n\n### 用户故事 2 的实现\n\n- [ ] T007 [US2] 实现断开连接操作与状态清理于 `src/components/WalletConnect.tsx`\n\n**检查点**: 用户故事 1 与 2 均可独立运行\n\n---\n\n## Phase 5: 用户故事 3 - 连接状态提示（优先级: P3）\n\n**目标**: 在缺少钱包或授权失败时提示用户\n\n**独立测试**: 无钱包环境进入页面可看到安装提示\n\n### 用户故事 3 的实现\n\n- [ ] T008 [US3] 实现钱包缺失提示与重试文案于 `src/components/WalletConnect.tsx`\n\n**检查点**: 三个用户故事均可独立运行\n\n---\n\n## Phase N: 打磨与跨领域工作\n\n**目的**: 影响多个用户故事的改进\n\n- [ ] T009 [P] 补充连接状态本地缓存与恢复逻辑于 `src/components/WalletConnect.tsx`\n- [ ] T010 更新快速开始说明于 `specs/002-wallet-connect/quickstart.md`\n\n---\n\n## 依赖与执行顺序\n\n### 阶段依赖\n\n- **设置（Phase 1）**: 无依赖 - 可立即开始\n- **基础能力（Phase 2）**: 依赖设置完成 - 阻塞所有用户故事\n- **用户故事（Phase 3+）**: 依赖基础能力完成\n  - 可并行（团队允许）\n  - 或按优先级顺序 (P1 → P2 → P3)\n- **打磨（最终阶段）**: 依赖所有目标用户故事完成\n\n### 用户故事依赖\n\n- **用户故事 1 (P1)**: 可在基础能力完成后开始 - 不依赖其他故事\n- **用户故事 2 (P2)**: 可在基础能力完成后开始 - 依赖用户故事 1 的连接状态\n- **用户故事 3 (P3)**: 可在基础能力完成后开始 - 依赖基础提示逻辑\n\n### 并行机会\n\n- Phase 1 的 T001 与 T002 可并行\n- Phase N 的 T009 与 T010 可并行\n\n---\n\n## 并行示例: 用户故事 1\n\n```bash\nTask: \"实现连接按钮与授权流程于 src/components/WalletConnect.tsx\"\nTask: \"展示连接成功状态与地址于 src/components/WalletConnect.tsx\"\n```\n\n---\n\n## 实施策略\n\n### MVP 优先（仅用户故事 1）\n\n1. 完成 Phase 1: 设置\n2. 完成 Phase 2: 基础能力（关键 - 阻塞所有故事）\n3. 完成 Phase 3: 用户故事 1\n4. **停止并验证**: 独立测试用户故事 1\n\n### 增量交付\n\n1. 完成设置 + 基础能力 → 基础可用\n2. 添加用户故事 1 → 验证 → MVP 可用\n3. 添加用户故事 2 → 验证 → 断开功能可用\n4. 添加用户故事 3 → 验证 → 提示逻辑可用\n5. 最后进行 Phase N 打磨与跨领域检查\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:35:34.234219Z  INFO spawning ghost snapshot task
+2025-12-24T08:35:34.424056Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="100"
+2025-12-24T08:35:34.424076Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:35:42.431763Z  INFO ToolCall: shell_command {"command":"rg -n \"mcpServers\" -S /Users/mao/code/CopyTradingCodex","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:35:50.274666Z  INFO ToolCall: shell_command {"command":"rg -n \"mcpServers\" -S /Users/mao/code/CopyTradingCodex/.codex /Users/mao/.codex","workdir":"/Users/mao/code/CopyTradingCodex","sandbox_permissions":"require_escalated","justification":"需要在用户配置目录中查找 Codex MCP 配置位置以便更新。"}
+2025-12-24T08:36:04.484762Z  INFO ToolCall: shell_command {"command":"ls -a /Users/mao/.codex","workdir":"/Users/mao/code/CopyTradingCodex","sandbox_permissions":"require_escalated","justification":"需要查看用户级 Codex 配置目录以定位 MCP 配置文件。"}
+2025-12-24T08:36:11.958459Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/.codex/config.toml","workdir":"/Users/mao/code/CopyTradingCodex","sandbox_permissions":"require_escalated","justification":"需要读取 Codex 配置文件以添加 MCP 服务器配置。"}
+2025-12-24T08:36:38.322155Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/.codex/config.toml
+@@
+ model = "gpt-5.2-codex"
+ model_reasoning_effort = "medium"
++
++[mcpServers."Chrome DevTools MCP"]
++command = "npx"
++args = ["-y", "chrome-devtools-mcp@latest"]
++env = {}
+*** End Patch
+2025-12-24T08:36:50.324128Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/.codex/config.toml
+@@
+ model = "gpt-5.2-codex"
+ model_reasoning_effort = "medium"
++[mcpServers."Chrome DevTools MCP"]
++command = "npx"
++args = ["-y", "chrome-devtools-mcp@latest"]
++env = {}
++
+ [projects."/Users/mao/code/CopyTradingCodex"]
+ trust_level = "trusted"
+*** End Patch
+2025-12-24T08:37:05.190134Z  INFO ToolCall: list_mcp_resources {}
+2025-12-24T08:40:57.774991Z  INFO spawning ghost snapshot task
+2025-12-24T08:40:57.949740Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="3"
+2025-12-24T08:40:57.949761Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:41:04.074411Z  INFO ToolCall: list_mcp_resources {}
+2025-12-24T08:41:26.982358Z  INFO spawning ghost snapshot task
+2025-12-24T08:41:27.144714Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="5"
+2025-12-24T08:41:27.144735Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:41:32.427853Z  INFO ToolCall: shell_command {"command":"ls","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:41:36.797621Z  INFO ToolCall: shell_command {"command":"cat .codex/config.toml","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:42:01.380916Z  INFO spawning ghost snapshot task
+2025-12-24T08:42:01.533049Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="7"
+2025-12-24T08:42:01.533069Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:42:41.019325Z  INFO spawning ghost snapshot task
+2025-12-24T08:42:41.196895Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="104"
+2025-12-24T08:42:41.196915Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:42:51.941030Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/.codex/config.toml","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:43:00.816194Z  INFO ToolCall: list_mcp_resources {}
+2025-12-24T08:43:22.127155Z  INFO spawning ghost snapshot task
+2025-12-24T08:43:22.295751Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="106"
+2025-12-24T08:43:22.295779Z  INFO ghost snapshot gate marked ready
+2025-12-24T08:43:35.696213Z  INFO ToolCall: shell_command {"command":".specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:43:48.500119Z  INFO ToolCall: shell_command {"command":"python - <<'PY'\nfrom pathlib import Path\nchecklists_dir = Path('/Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/checklists')\nrows = []\nif checklists_dir.exists():\n    for path in sorted(checklists_dir.glob('*.md')):\n        lines = path.read_text().splitlines()\n        total = sum(1 for l in lines if l.strip().startswith('- [') and l.strip()[3:4] in {' ', 'x', 'X'})\n        completed = sum(1 for l in lines if l.strip().startswith('- [x]') or l.strip().startswith('- [X]'))\n        incomplete = sum(1 for l in lines if l.strip().startswith('- [ ]'))\n        status = '✓ PASS' if incomplete == 0 else '✗ FAIL'\n        rows.append((path.name, total, completed, incomplete, status))\n\nprint('| Checklist | Total | Completed | Incomplete | Status |')\nprint('|-----------|-------|-----------|------------|--------|')\nfor name, total, completed, incomplete, status in rows:\n    print(f'| {name} | {total} | {completed} | {incomplete} | {status} |')\n\nif rows and any(r[3] > 0 for r in rows):\n    print('OVERALL: FAIL')\nelse:\n    print('OVERALL: PASS')\nPY","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:43:56.684250Z  INFO ToolCall: shell_command {"command":"cat /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/tasks.md","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:44:14.603911Z  INFO ToolCall: shell_command {"command":"sed -n '1,220p' /Users/mao/code/CopyTradingCodex/src/components/WalletConnect.tsx","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:44:40.204090Z  INFO ToolCall: shell_command {"command":"sed -n '1,200p' /Users/mao/code/CopyTradingCodex/src/components/Header.tsx","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:45:06.208218Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/src/types/wallet.ts\nexport type WalletStatus = 'disconnected' | 'connecting' | 'connected' | 'unavailable' | 'error';\n\nexport interface WalletProvider {\n  request: (args: { method: string; params?: unknown[] | Record<string, unknown> }) => Promise<unknown>;\n  on?: (event: string, handler: (...args: unknown[]) => void) => void;\n  removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;\n  isMetaMask?: boolean;\n  isOkxWallet?: boolean;\n  isOKXWallet?: boolean;\n}\n\nexport interface WalletProviderInfo {\n  provider: WalletProvider;\n  name: 'OKX' | 'MetaMask' | 'Injected';\n}\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:45:14.456909Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/src/utils/formatWalletAddress.ts\nexport function formatWalletAddress(address: string): string {\n  if (!address) return '';\n  if (address.length <= 10) return address;\n  return `${address.slice(0, 6)}...${address.slice(-4)}`;\n}\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:45:32.352888Z  INFO ToolCall: shell_command {"command":"cat <<'EOF' > /Users/mao/code/CopyTradingCodex/src/utils/wallet.ts\nimport type { WalletProvider, WalletProviderInfo } from '../types/wallet';\n\nconst OKX_KEY = 'okxwallet';\n\nfunction pickProviderFromList(providers: WalletProvider[]): WalletProviderInfo | null {\n  const okx = providers.find((p) => p.isOkxWallet || p.isOKXWallet);\n  if (okx) {\n    return { provider: okx, name: 'OKX' };\n  }\n  const metamask = providers.find((p) => p.isMetaMask);\n  if (metamask) {\n    return { provider: metamask, name: 'MetaMask' };\n  }\n  return providers.length ? { provider: providers[0], name: 'Injected' } : null;\n}\n\nexport function getInjectedProvider(): WalletProviderInfo | null {\n  if (typeof window === 'undefined') return null;\n  const anyWindow = window as unknown as Record<string, unknown>;\n\n  const okxProvider = anyWindow[OKX_KEY] as WalletProvider | undefined;\n  if (okxProvider) {\n    return { provider: okxProvider, name: 'OKX' };\n  }\n\n  const ethereum = (anyWindow as any).ethereum as WalletProvider | undefined;\n  if (!ethereum) return null;\n\n  const providerList = (ethereum as any).providers as WalletProvider[] | undefined;\n  if (providerList?.length) {\n    return pickProviderFromList(providerList);\n  }\n\n  if (ethereum.isMetaMask) {\n    return { provider: ethereum, name: 'MetaMask' };\n  }\n\n  return { provider: ethereum, name: 'Injected' };\n}\n\nexport async function requestAccounts(provider: WalletProvider): Promise<string[]> {\n  const result = await provider.request({ method: 'eth_requestAccounts' });\n  return Array.isArray(result) ? (result as string[]) : [];\n}\n\nexport async function getAccounts(provider: WalletProvider): Promise<string[]> {\n  const result = await provider.request({ method: 'eth_accounts' });\n  return Array.isArray(result) ? (result as string[]) : [];\n}\n\nexport function subscribeAccountsChanged(\n  provider: WalletProvider,\n  handler: (accounts: string[]) => void\n): () => void {\n  if (!provider.on) return () => undefined;\n\n  const listener = (accounts: unknown) => {\n    handler(Array.isArray(accounts) ? (accounts as string[]) : []);\n  };\n\n  provider.on('accountsChanged', listener);\n\n  return () => {\n    provider.removeListener?.('accountsChanged', listener);\n  };\n}\nEOF","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T08:45:41.348524Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/utils/translations.ts
+@@
+     connectWallet: 'Connect Wallet',
+     disconnect: 'Disconnect',
+     connected: 'Connected',
++    installWallet: 'Install Wallet',
++    walletUnavailable: 'Wallet extension not detected',
++    connectFailed: 'Connection failed',
++    retry: 'Retry',
+@@
+     connectWallet: '连接钱包',
+     disconnect: '断开连接',
+     connected: '已连接',
++    installWallet: '安装钱包',
++    walletUnavailable: '未检测到钱包扩展',
++    connectFailed: '连接失败',
++    retry: '重试',
+*** End Patch
+2025-12-24T08:46:16.739578Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/WalletConnect.tsx
+@@
+-import { useState } from 'react';
++import { useEffect, useState } from 'react';
+ import { Button } from './ui/button';
+ import { Wallet } from 'lucide-react';
+ import { Language } from '../types/trader';
+ import { t } from '../utils/translations';
++import { formatWalletAddress } from '../utils/formatWalletAddress';
++import {
++  getAccounts,
++  getInjectedProvider,
++  requestAccounts,
++  subscribeAccountsChanged,
++} from '../utils/wallet';
++import type { WalletStatus, WalletProviderInfo } from '../types/wallet';
+@@
+ export function WalletConnect({ lang }: WalletConnectProps) {
+-  const [isConnected, setIsConnected] = useState(false);
+-  const [address, setAddress] = useState('');
++  const [status, setStatus] = useState<WalletStatus>('disconnected');
++  const [address, setAddress] = useState('');
++  const [error, setError] = useState('');
++  const [providerInfo, setProviderInfo] = useState<WalletProviderInfo | null>(null);
+ 
+-  const connectWallet = async () => {
+-    // Mock wallet connection
+-    // In production, this would integrate with Web3 wallet like MetaMask
+-    const mockAddress = '0x' + Math.random().toString(16).substring(2, 42);
+-    setAddress(mockAddress);
+-    setIsConnected(true);
+-  };
++  useEffect(() => {
++    const info = getInjectedProvider();
++    setProviderInfo(info);
++    if (!info) {
++      setStatus('unavailable');
++      return;
++    }
++
++    let cleanup = () => undefined;
++
++    const syncAccounts = async () => {
++      try {
++        const accounts = await getAccounts(info.provider);
++        if (accounts[0]) {
++          setAddress(accounts[0]);
++          setStatus('connected');
++          localStorage.setItem('wallet_address', accounts[0]);
++        } else {
++          setAddress('');
++          setStatus('disconnected');
++          localStorage.removeItem('wallet_address');
++        }
++      } catch {
++        setStatus('error');
++      }
++    };
++
++    syncAccounts();
++    cleanup = subscribeAccountsChanged(info.provider, (accounts) => {
++      if (accounts[0]) {
++        setAddress(accounts[0]);
++        setStatus('connected');
++        localStorage.setItem('wallet_address', accounts[0]);
++      } else {
++        setAddress('');
++        setStatus('disconnected');
++        localStorage.removeItem('wallet_address');
++      }
++    });
++
++    return () => cleanup();
++  }, []);
+ 
+-  const disconnectWallet = () => {
+-    setAddress('');
+-    setIsConnected(false);
+-  };
++  const connectWallet = async () => {
++    if (!providerInfo) {
++      setStatus('unavailable');
++      return;
++    }
++
++    setError('');
++    setStatus('connecting');
++
++    try {
++      const accounts = await requestAccounts(providerInfo.provider);
++      if (accounts[0]) {
++        setAddress(accounts[0]);
++        setStatus('connected');
++        localStorage.setItem('wallet_address', accounts[0]);
++      } else {
++        setStatus('disconnected');
++      }
++    } catch {
++      setError(t('connectFailed', lang));
++      setStatus('error');
++    }
++  };
++
++  const disconnectWallet = () => {
++    setAddress('');
++    setStatus('disconnected');
++    localStorage.removeItem('wallet_address');
++  };
+ 
+-  if (isConnected) {
++  if (status === 'connected') {
+     return (
+       <div className="flex items-center gap-2">
+         <div className="px-4 h-10 flex items-center bg-white/10 backdrop-blur-md border border-white/20 rounded-lg text-white text-sm">
+-          {address.substring(0, 6)}...{address.substring(address.length - 4)}
++          {formatWalletAddress(address)}
+         </div>
+         <Button
+           onClick={disconnectWallet}
+           variant="outline"
+           className="h-10 bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20"
+           style={{ backdropFilter: 'blur(10px)' }}
+         >
+           {t('disconnect', lang)}
+         </Button>
+       </div>
+     );
+   }
+ 
++  if (status === 'unavailable') {
++    return (
++      <div className="flex flex-col items-end gap-1">
++        <Button
++          onClick={connectWallet}
++          className="h-10 bg-white/10 border border-white/20 text-white"
++          style={{ backdropFilter: 'blur(10px)' }}
++        >
++          <Wallet className="w-4 h-4 mr-2" />
++          {t('installWallet', lang)}
++        </Button>
++        <span className="text-xs text-white/60">{t('walletUnavailable', lang)}</span>
++      </div>
++    );
++  }
++
+   return (
+-    <Button
+-      onClick={connectWallet}
+-      className="h-10 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+-    >
+-      <Wallet className="w-4 h-4 mr-2" />
+-      {t('connectWallet', lang)}
+-    </Button>
++    <div className="flex flex-col items-end gap-1">
++      <Button
++        onClick={connectWallet}
++        className="h-10 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
++      >
++        <Wallet className="w-4 h-4 mr-2" />
++        {status === 'connecting' ? t('connected', lang) : t('connectWallet', lang)}
++      </Button>
++      {error && <span className="text-xs text-red-300">{error}</span>}
++      {status === 'error' && !error && (
++        <span className="text-xs text-red-300">{t('connectFailed', lang)}</span>
++      )}
++    </div>
+   );
+ }
+*** End Patch
+2025-12-24T08:46:29.112803Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/utils/translations.ts
+@@
+     connected: 'Connected',
++    connecting: 'Connecting...',
+@@
+     connected: '已连接',
++    connecting: '连接中...',
+*** End Patch
+2025-12-24T08:46:37.706455Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/WalletConnect.tsx
+@@
+-        {status === 'connecting' ? t('connected', lang) : t('connectWallet', lang)}
++        {status === 'connecting' ? t('connecting', lang) : t('connectWallet', lang)}
+*** End Patch
+2025-12-24T08:47:01.203598Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/WalletConnect.tsx
+@@
+-    const syncAccounts = async () => {
++    const syncAccounts = async () => {
++      const cachedAddress = localStorage.getItem('wallet_address') ?? '';
+       try {
+         const accounts = await getAccounts(info.provider);
+         if (accounts[0]) {
+           setAddress(accounts[0]);
+           setStatus('connected');
+           localStorage.setItem('wallet_address', accounts[0]);
++        } else if (cachedAddress) {
++          setAddress(cachedAddress);
++          setStatus('connected');
+         } else {
+           setAddress('');
+           setStatus('disconnected');
+           localStorage.removeItem('wallet_address');
+*** End Patch
+2025-12-24T08:47:16.948355Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/quickstart.md
+@@
+ ## 验证步骤
+ 
+ 1. 在 Chrome 打开页面，点击“连接钱包”。
+-2. 选择 OKX/MetaMask 并完成授权。
+-3. 观察地址展示与“已连接”状态。
+-4. 点击“断开连接”，确认状态恢复为未连接。
++2. 若未安装钱包扩展，先安装 OKX/MetaMask 后刷新页面。
++3. 选择 OKX/MetaMask 并完成授权。
++4. 观察地址展示与“已连接”状态。
++5. 点击“断开连接”，确认状态恢复为未连接。
+*** End Patch
+2025-12-24T08:47:36.997770Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/specs/002-wallet-connect/tasks.md
+@@
+-- [ ] T001 创建钱包会话类型定义于 `src/types/wallet.ts`
+-- [ ] T002 创建钱包连接工具函数于 `src/utils/wallet.ts`
++- [X] T001 创建钱包会话类型定义于 `src/types/wallet.ts`
++- [X] T002 创建钱包连接工具函数于 `src/utils/wallet.ts`
+@@
+-- [ ] T003 在 `src/components/WalletConnect.tsx` 中接入钱包检测与状态管理
+-- [ ] T004 统一地址格式化工具于 `src/utils/formatWalletAddress.ts`
++- [X] T003 在 `src/components/WalletConnect.tsx` 中接入钱包检测与状态管理
++- [X] T004 统一地址格式化工具于 `src/utils/formatWalletAddress.ts`
+@@
+-- [ ] T005 [US1] 实现连接按钮与授权流程于 `src/components/WalletConnect.tsx`
+-- [ ] T006 [US1] 展示连接成功状态与地址于 `src/components/WalletConnect.tsx`
++- [X] T005 [US1] 实现连接按钮与授权流程于 `src/components/WalletConnect.tsx`
++- [X] T006 [US1] 展示连接成功状态与地址于 `src/components/WalletConnect.tsx`
+@@
+-- [ ] T007 [US2] 实现断开连接操作与状态清理于 `src/components/WalletConnect.tsx`
++- [X] T007 [US2] 实现断开连接操作与状态清理于 `src/components/WalletConnect.tsx`
+@@
+-- [ ] T008 [US3] 实现钱包缺失提示与重试文案于 `src/components/WalletConnect.tsx`
++- [X] T008 [US3] 实现钱包缺失提示与重试文案于 `src/components/WalletConnect.tsx`
+@@
+-- [ ] T009 [P] 补充连接状态本地缓存与恢复逻辑于 `src/components/WalletConnect.tsx`
+-- [ ] T010 更新快速开始说明于 `specs/002-wallet-connect/quickstart.md`
++- [X] T009 [P] 补充连接状态本地缓存与恢复逻辑于 `src/components/WalletConnect.tsx`
++- [X] T010 更新快速开始说明于 `specs/002-wallet-connect/quickstart.md`
+*** End Patch
+2025-12-24T08:47:47.009466Z  INFO ToolCall: list_mcp_resources {}
+2025-12-24T09:01:42.195755Z  INFO spawning ghost snapshot task
+2025-12-24T09:01:42.423232Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl src/components/WalletConnect.tsx src/utils/translations.ts specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md src/types/wallet.ts src/utils/formatWalletAddress.ts src/utils/wallet.ts` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="108"
+2025-12-24T09:01:42.423272Z  INFO ghost snapshot gate marked ready
+2025-12-24T09:01:53.457318Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/TradingPlatform.tsx
+@@
+ export function TradingPlatform() {
+     const [lang, setLang] = useState<Language>('en');
+     const [colorMode, setColorMode] = useState<ColorMode>('standard');
+     const [viewMode, setViewMode] = useState<ViewMode>('card');
++    const [web3Mock, setWeb3Mock] = useState(true);
+     const [sortBy, setSortBy] = useState<SortOption>('annualizedReturn');
+     const [selectedTrader, setSelectedTrader] = useState<Trader | null>(null);
+     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+     const [isCopyTradeModalOpen, setIsCopyTradeModalOpen] = useState(false);
+     const [copyTradeTrader, setCopyTradeTrader] = useState<Trader | null>(null);
+*** End Patch
+2025-12-24T09:02:02.843552Z  INFO ToolCall: shell_command {"command":"sed -n '1,40p' /Users/mao/code/CopyTradingCodex/src/components/TradingPlatform.tsx","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T09:02:11.902463Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/TradingPlatform.tsx
+@@
+-  const [viewMode, setViewMode] = useState<ViewMode>('table'); // Default to table view, "card" view
++  const [viewMode, setViewMode] = useState<ViewMode>('table'); // Default to table view, "card" view
++  const [web3Mock, setWeb3Mock] = useState(true);
+*** End Patch
+2025-12-24T09:02:26.685397Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/Header.tsx
+@@
+ interface HeaderProps {
+   lang: Language;
+   onLanguageChange: (lang: Language) => void;
+   colorMode: ColorMode;
+   onColorModeChange: (mode: ColorMode) => void;
++  web3Mock: boolean;
+ }
+ 
+-export function Header({ lang, onLanguageChange, colorMode, onColorModeChange }: HeaderProps) {
++export function Header({ lang, onLanguageChange, colorMode, onColorModeChange, web3Mock }: HeaderProps) {
+@@
+-            <WalletConnect lang={lang} />
++            <WalletConnect lang={lang} web3Mock={web3Mock} />
+           </div>
+         </div>
+       </div>
+     </header>
+   );
+ }
+*** End Patch
+2025-12-24T09:02:35.275865Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/TradingPlatform.tsx
+@@
+-      <Header lang={lang} onLanguageChange={setLang} colorMode={colorMode} onColorModeChange={setColorMode} />
++      <Header
++        lang={lang}
++        onLanguageChange={setLang}
++        colorMode={colorMode}
++        onColorModeChange={setColorMode}
++        web3Mock={web3Mock}
++      />
+*** End Patch
+2025-12-24T09:02:49.285666Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/WalletConnect.tsx
+@@
+ interface WalletConnectProps {
+   lang: Language;
++  web3Mock: boolean;
+ }
+ 
+-export function WalletConnect({ lang }: WalletConnectProps) {
++export function WalletConnect({ lang, web3Mock }: WalletConnectProps) {
+@@
+-  useEffect(() => {
++  useEffect(() => {
++    if (web3Mock) {
++      setStatus('disconnected');
++      return;
++    }
++
+     const info = getInjectedProvider();
+     setProviderInfo(info);
+     if (!info) {
+@@
+-  }, []);
++  }, [web3Mock]);
+ 
+   const connectWallet = async () => {
++    if (web3Mock) {
++      const mockAddress = `0x${Math.random().toString(16).slice(2, 42)}`;
++      setAddress(mockAddress);
++      setStatus('connected');
++      localStorage.setItem('wallet_address', mockAddress);
++      return;
++    }
++
+     if (!providerInfo) {
+       setStatus('unavailable');
+       return;
+@@
+-  if (status === 'unavailable') {
++  if (!web3Mock && status === 'unavailable') {
+     return (
+       <div className="flex flex-col items-end gap-1">
+         <Button
+*** End Patch
+2025-12-24T09:04:38.927068Z  INFO spawning ghost snapshot task
+2025-12-24T09:04:39.123605Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl src/components/Header.tsx src/components/TradingPlatform.tsx src/components/WalletConnect.tsx src/utils/translations.ts specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md src/types/wallet.ts src/utils/formatWalletAddress.ts src/utils/wallet.ts` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="110"
+2025-12-24T09:04:39.123829Z  INFO ghost snapshot gate marked ready
+2025-12-24T09:04:47.289002Z  INFO ToolCall: shell_command {"command":"sed -n '40,100p' /Users/mao/code/CopyTradingCodex/src/components/WalletConnect.tsx","workdir":"/Users/mao/code/CopyTradingCodex"}
+2025-12-24T09:04:47.957876Z  INFO interrupt received: abort current task, if any
+2025-12-24T09:04:57.533449Z  INFO spawning ghost snapshot task
+2025-12-24T09:04:57.714103Z  WARN failed to capture ghost snapshot: git command `git add --all -- .codex/config.toml .codex/history.jsonl .codex/log/codex-tui.log .codex/rules/default.rules .codex/sessions/2025/12/24/rollout-2025-12-24T10-00-58-019b4e16-8994-7463-a7e3-b226eda3febf.jsonl src/components/Header.tsx src/components/TradingPlatform.tsx src/components/WalletConnect.tsx src/utils/translations.ts specs/002-wallet-connect/checklists/requirements.md specs/002-wallet-connect/contracts/openapi.yaml specs/002-wallet-connect/data-model.md specs/002-wallet-connect/plan.md specs/002-wallet-connect/quickstart.md specs/002-wallet-connect/research.md specs/002-wallet-connect/spec.md specs/002-wallet-connect/tasks.md src/types/wallet.ts src/utils/formatWalletAddress.ts src/utils/wallet.ts` failed with status exit status: 1: 下列路径根据您的一个 .gitignore 文件而被忽略：
+.codex
+提示：如果您确实要添加它们，使用 -f 参数。
+提示：运行下面的命令来关闭本消息
+提示："git config advice.addIgnoredFile false" sub_id="113"
+2025-12-24T09:04:57.714131Z  INFO ghost snapshot gate marked ready
+2025-12-24T09:05:05.101211Z  INFO ToolCall: apply_patch *** Begin Patch
+*** Update File: /Users/mao/code/CopyTradingCodex/src/components/WalletConnect.tsx
+@@
+-    let cleanup = () => undefined;
++    let cleanup: () => void = () => {};
+@@
+-    return () => cleanup();
++    return () => cleanup();
+   }, [web3Mock]);
+*** End Patch

@@ -1,0 +1,6 @@
+openapi: 3.0.3
+info:
+  title: 钱包连接 API（前端会话）
+  version: 0.1.0
+  description: 本功能不依赖服务端接口，保留占位说明。
+paths: {}
