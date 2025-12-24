@@ -1,10 +1,16 @@
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Trader, Language, ColorMode } from '../types/trader';
+import { Trader, Language, ColorMode, TimePeriod, Trade } from '../types/trader';
 import { RadarChart } from './RadarChart';
 import { CumulativeReturnsChart } from './CumulativeReturnsChart';
+import { MetricTabs } from './MetricTabs';
+import { RiskNotice } from './RiskNotice';
+import { fetchTraderMetrics } from '../services/metrics';
+import { fetchTraderTrades } from '../services/trades';
+import { fetchEquitySeries } from '../services/equity';
 import { t } from '../utils/translations';
 import { getValueColor } from '../utils/colorMode';
 import { formatTraderAge } from '../utils/formatTraderAge';
@@ -22,7 +28,81 @@ interface TraderDetailModalProps {
 export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, colorMode }: TraderDetailModalProps) {
   if (!trader) return null;
 
-  const isPositive = trader.allTimeReturn > 0;
+  const displayReturn = metricOverride.returnRate ?? trader.allTimeReturn;
+  const isPositive = displayReturn > 0;
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('30D');
+  const [detailTrades, setDetailTrades] = useState<Trade[]>(trader.trades);
+  const [equitySeries, setEquitySeries] = useState(trader.pnlData);
+  const [metricOverride, setMetricOverride] = useState<{
+    returnRate?: number;
+    maxDrawdown?: number;
+    winRate?: number;
+  }>({});
+
+  useEffect(() => {
+    setDetailTrades(trader.trades);
+    setEquitySeries(trader.pnlData);
+    setMetricOverride({});
+  }, [trader]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadDetails = async () => {
+      try {
+        const [metrics, trades, equity] = await Promise.all([
+          fetchTraderMetrics(trader.id, timePeriod),
+          fetchTraderTrades(trader.id),
+          fetchEquitySeries(trader.id, timePeriod),
+        ]);
+
+        if (!isActive) return;
+
+        if (metrics) {
+          setMetricOverride({
+            returnRate: metrics.return_rate ?? metrics.returnRate,
+            maxDrawdown: metrics.max_drawdown ?? metrics.maxDrawdown,
+            winRate: metrics.win_rate ?? metrics.winRate,
+          });
+        }
+
+        if (Array.isArray(trades?.items)) {
+          setDetailTrades(
+            trades.items.map((item: any, index: number) => ({
+              id: item.id ?? item.tx_hash ?? `trade-${index}`,
+              timestamp: new Date(item.timestamp).getTime(),
+              type: item.side ?? item.type ?? 'long',
+              entry: item.entry ?? item.entry_price ?? 0,
+              exit: item.exit ?? item.exit_price ?? 0,
+              pnl: item.pnl ?? 0,
+              size: item.size ?? 0,
+            }))
+          );
+        }
+
+        if (Array.isArray(equity?.points)) {
+          setEquitySeries(
+            equity.points.map((point: any) => ({
+              timestamp: new Date(point.timestamp).getTime(),
+              pnl: point.vault_equity ?? point.vaultEquity ?? 0,
+              btcPnl: point.btc_equity ?? point.btcEquity ?? 0,
+            }))
+          );
+        }
+      } catch {
+        if (!isActive) return;
+        setDetailTrades(trader.trades);
+        setEquitySeries(trader.pnlData);
+        setMetricOverride({});
+      }
+    };
+
+    loadDetails();
+
+    return () => {
+      isActive = false;
+    };
+  }, [trader, timePeriod]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -101,19 +181,19 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-white/5 rounded-lg">
                   <p className="text-white/70 text-sm mb-1">{t('allTimeReturnLabel', lang)}</p>
-                  <p className={`text-xl ${getValueColor(trader.allTimeReturn, colorMode)}`}>
-                    {isPositive ? '+' : ''}{trader.allTimeReturn.toFixed(1)}%
+                  <p className={`text-xl ${getValueColor(metricOverride.returnRate ?? trader.allTimeReturn, colorMode)}`}>
+                    {isPositive ? '+' : ''}{(metricOverride.returnRate ?? trader.allTimeReturn).toFixed(1)}%
                   </p>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg">
                   <p className="text-white/70 text-sm mb-1">{t('maxDrawdownLabel', lang)}</p>
-                  <p className={`text-xl ${getValueColor(-Math.abs(trader.maxDrawdownPercent), colorMode)}`}>
-                    {trader.maxDrawdownPercent.toFixed(1)}%
+                  <p className={`text-xl ${getValueColor(-Math.abs(metricOverride.maxDrawdown ?? trader.maxDrawdownPercent), colorMode)}`}>
+                    {(metricOverride.maxDrawdown ?? trader.maxDrawdownPercent).toFixed(1)}%
                   </p>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg">
                   <p className="text-white/70 text-sm mb-1">{t('winRateLabel', lang)}</p>
-                  <p className="text-xl text-white">{trader.winRatePercent.toFixed(1)}%</p>
+                  <p className="text-xl text-white">{(metricOverride.winRate ?? trader.winRatePercent).toFixed(1)}%</p>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg">
                   <p className="text-white/70 text-sm mb-1">{t('avgTradesPerDay', lang)}</p>
@@ -133,10 +213,15 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
             <p className="text-white/90">{trader.aiStrategy[lang]}</p>
           </div>
 
+          <RiskNotice lang={lang} />
+
           {/* Balance Chart vs Bitcoin */}
           <div className="p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg">
-            <h3 className="text-white mb-4">{t('balanceChart', lang)}</h3>
-            <CumulativeReturnsChart data={trader.pnlData} height={300} showBtcComparison={true} colorMode={colorMode} />
+            <div className="flex flex-col gap-3 mb-4">
+              <h3 className="text-white">{t('balanceChart', lang)}</h3>
+              <MetricTabs value={timePeriod} onChange={setTimePeriod} />
+            </div>
+            <CumulativeReturnsChart data={equitySeries} height={300} showBtcComparison={true} colorMode={colorMode} lang={lang} />
           </div>
 
           {/* Trade History */}
@@ -155,7 +240,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {trader.trades.slice(0, 50).map((trade) => (
+                  {detailTrades.slice(0, 50).map((trade) => (
                     <TableRow key={trade.id} className="border-white/20">
                       <TableCell className="text-white text-sm">
                         {new Date(trade.timestamp).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN')}

@@ -135,7 +135,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
         <p className="text-white/70 text-xs mb-2">
           {lang === 'en' ? 'Cumulative Returns' : '累计收益'}
         </p>
-        <CumulativeReturnsChart data={trader.pnlData} height={120} colorMode={colorMode} />
+        <CumulativeReturnsChart data={trader.pnlData} height={120} colorMode={colorMode} lang={lang} />
       </div>
 
       {/* All Metrics - Equal Priority */}

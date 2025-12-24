@@ -227,7 +227,7 @@ export function TraderTableView({
                 </TableCell>
                 <TableCell className="text-center">
                   <div className="w-[240px] h-[120px] mx-auto">
-                    <CumulativeReturnsChart data={trader.pnlData} height={120} colorMode={colorMode} />
+                    <CumulativeReturnsChart data={trader.pnlData} height={120} colorMode={colorMode} lang={lang} />
                   </div>
                 </TableCell>
                 <TableCell className="text-white text-center">

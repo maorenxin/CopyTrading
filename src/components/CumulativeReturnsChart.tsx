@@ -1,14 +1,15 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { PnLDataPoint, ColorMode } from '../types/trader';
+import { PnLDataPoint, ColorMode, Language } from '../types/trader';
 import { getPositiveStrokeColor, getNegativeStrokeColor } from '../utils/colorMode';
 
 interface CumulativeReturnsChartProps {
   data: PnLDataPoint[];
   height?: number;
   colorMode: ColorMode;
+  lang: Language;
 }
 
-export function CumulativeReturnsChart({ data, height = 150, colorMode }: CumulativeReturnsChartProps) {
+export function CumulativeReturnsChart({ data, height = 150, colorMode, lang }: CumulativeReturnsChartProps) {
   // Calculate cumulative returns as percentage change from initial value
   const initialValue = data[0]?.pnl || 1000;
   
@@ -59,13 +60,26 @@ export function CumulativeReturnsChart({ data, height = 150, colorMode }: Cumula
           width={35}
         />
         <Tooltip
-          contentStyle={{
-            backgroundColor: 'rgba(26, 11, 46, 0.95)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '8px',
-            color: '#fff'
+          content={({ label, payload }) => {
+            const returnItem = payload?.find((item) => item.dataKey === 'return');
+            if (!returnItem || typeof returnItem.value !== 'number') return null;
+            const dateLabel = lang === 'en' ? 'Date' : '日期';
+            const returnLabel = lang === 'en' ? 'Return' : '回报';
+            return (
+              <div
+                className="text-sm text-white"
+                style={{
+                  backgroundColor: 'rgba(26, 11, 46, 0.95)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '8px',
+                  padding: '8px 10px',
+                }}
+              >
+                <div className="mb-1">{dateLabel}: {label}</div>
+                <div>{returnLabel}: {returnItem.value.toFixed(2)}%</div>
+              </div>
+            );
           }}
-          formatter={(value: number) => [`${value.toFixed(2)}%`, 'Return']}
         />
         <ReferenceLine y={0} stroke="rgba(255, 255, 255, 0.3)" strokeDasharray="3 3" />
         
