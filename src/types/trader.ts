@@ -54,10 +54,15 @@ export interface Trader {
 export type SortOption =
   | "sharpe"
   | "allTimeReturn"
+  | "annualizedReturn"
   | "maxDrawdown"
   | "winRate"
   | "traderAge"
-  | "followerCount";
+  | "followerCount"
+  | "balance"
+  | "timeInMarket"
+  | "avgHoldDays"
+  | "avgTradesPerDay";
 
 export type ViewMode = "card" | "table";
 export type Language = "en" | "cn";

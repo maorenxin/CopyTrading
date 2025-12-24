@@ -16,10 +16,10 @@ import { t } from '../utils/translations';
 import { fetchTraders } from '../services/traders';
 
 export function TradingPlatform() {
-    const [lang, setLang] = useState<Language>('en');
+    const [lang, setLang] = useState<Language>('cn');
     const [colorMode, setColorMode] = useState<ColorMode>('standard');
-    const [viewMode, setViewMode] = useState<ViewMode>('card');
-    const [sortBy, setSortBy] = useState<SortOption>('allTimeReturn');
+    const [viewMode, setViewMode] = useState<ViewMode>('table'); // Default to table view, "card" view
+    const [sortBy, setSortBy] = useState<SortOption>('annualizedReturn');
     const [selectedTrader, setSelectedTrader] = useState<Trader | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isCopyTradeModalOpen, setIsCopyTradeModalOpen] = useState(false);
@@ -111,18 +111,26 @@ export function TradingPlatform() {
 
         // Card view sorting
         switch (sortBy) {
+            case 'annualizedReturn':
+                return sortedTradersList.sort((a, b) => b.annualizedReturn - a.annualizedReturn);
             case 'sharpe':
                 return sortedTradersList.sort((a, b) => b.metrics.sharpe - a.metrics.sharpe);
-            case 'allTimeReturn':
-                return sortedTradersList.sort((a, b) => b.allTimeReturn - a.allTimeReturn);
             case 'maxDrawdown':
                 return sortedTradersList.sort((a, b) => a.maxDrawdownPercent - b.maxDrawdownPercent); // Lower is better
-            case 'winRate':
-                return sortedTradersList.sort((a, b) => b.winRatePercent - a.winRatePercent);
+            case 'balance':
+                return sortedTradersList.sort((a, b) => b.balance - a.balance);
             case 'traderAge':
                 return sortedTradersList.sort((a, b) => b.traderAgeDays - a.traderAgeDays);
+            case 'timeInMarket':
+                return sortedTradersList.sort((a, b) => b.timeInMarketPercent - a.timeInMarketPercent);
             case 'followerCount':
                 return sortedTradersList.sort((a, b) => b.followerCount - a.followerCount);
+            case 'winRate':
+                return sortedTradersList.sort((a, b) => b.winRatePercent - a.winRatePercent);
+            case 'avgHoldDays':
+                return sortedTradersList.sort((a, b) => b.avgHoldDays - a.avgHoldDays);
+            case 'avgTradesPerDay':
+                return sortedTradersList.sort((a, b) => b.avgTradesPerDay - a.avgTradesPerDay);
             default:
                 return sortedTradersList;
         }
@@ -266,12 +274,16 @@ export function TradingPlatform() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="bg-[#1A0B2E] border-white/20 text-white">
-                                            <SelectItem value="allTimeReturn">{t('allTimeReturn', lang)}</SelectItem>
+                                            <SelectItem value="annualizedReturn">{t('arr', lang)}</SelectItem>
                                             <SelectItem value="sharpe">{t('sharpe', lang)}</SelectItem>
                                             <SelectItem value="maxDrawdown">{t('maxDrawdown', lang)}</SelectItem>
-                                            <SelectItem value="winRate">{t('winRate', lang)}</SelectItem>
+                                            <SelectItem value="balance">{t('balance', lang)}</SelectItem>
                                             <SelectItem value="traderAge">{t('traderAge', lang)}</SelectItem>
+                                            <SelectItem value="timeInMarket">{t('timeInMarket', lang)}</SelectItem>
                                             <SelectItem value="followerCount">{t('followerCount', lang)}</SelectItem>
+                                            <SelectItem value="winRate">{t('winRate', lang)}</SelectItem>
+                                            <SelectItem value="avgHoldDays">{t('avgHoldDays', lang)}</SelectItem>
+                                            <SelectItem value="avgTradesPerDay">{t('avgTradesPerDay', lang)}</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
