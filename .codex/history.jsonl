@@ -48,3 +48,6 @@
 {"session_id":"019b4e16-8994-7463-a7e3-b226eda3febf","ts":1766566902,"text":"目前暂时ok，在TradingPlatform.tsx的开头设置一个const [web3Mock,...] 默认是true，如果是true那么点击connect wallet就默认链上了，如果是false那么需要唤起web3钱包来链接。"}
 {"session_id":"019b4e16-8994-7463-a7e3-b226eda3febf","ts":1766567078,"text":"WalletConnect.tsx中63行有编译bug：    cleanup = subscribeAccountsChanged(info.provider, (accounts) => {"}
 {"session_id":"019b4e16-8994-7463-a7e3-b226eda3febf","ts":1766567097,"text":"WalletConnect.tsx中63行有编译bug：    cleanup = subscribeAccountsChanged(info.provider, (accounts) => { ===》不能将类型“() => void”分配给类型“() => undefined”。\n  不能将类型“void”分配给类型“undefined”。"}
+{"session_id":"019b4e16-8994-7463-a7e3-b226eda3febf","ts":1766567255,"text":"002-wallet-connect的功能很好，现在新建一个master分支作为主分支，将001*和002*两个branch分别rebase回去"}
+{"session_id":"019b4e16-8994-7463-a7e3-b226eda3febf","ts":1766567368,"text":"C+2"}
+{"session_id":"019b4e16-8994-7463-a7e3-b226eda3febf","ts":1766567432,"text":"1"}
