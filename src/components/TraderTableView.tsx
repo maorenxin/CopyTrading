@@ -19,21 +19,21 @@ interface TraderTableViewProps {
   sortDirection: 'asc' | 'desc';
 }
 
-export function TraderTableView({ 
-  traders, 
-  lang, 
-  colorMode, 
+export function TraderTableView({
+  traders,
+  lang,
+  colorMode,
   onViewDetails,
   onSort,
   sortColumn,
-  sortDirection 
+  sortDirection
 }: TraderTableViewProps) {
-  
+
   const renderSortIcon = (column: string) => {
     if (sortColumn !== column) {
       return <ArrowUpDown className="w-5 h-5 text-white/40 ml-1.5 inline-block" />;
     }
-    return sortDirection === 'desc' 
+    return sortDirection === 'desc'
       ? <ArrowDown className="w-5 h-5 text-blue-400 ml-1.5 inline-block" />
       : <ArrowUp className="w-5 h-5 text-blue-400 ml-1.5 inline-block" />;
   };
@@ -55,14 +55,14 @@ export function TraderTableView({
           <TableRow className="border-white/20 hover:bg-white/5">
             <TableHead className="text-white/70 text-center text-base">Rank</TableHead>
             <TableHead className="text-white/70 text-center text-base">{t('traderAddress', lang)}</TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('annualizedReturn', e)}
             >
               <div className="flex items-center justify-center gap-1">
                 <Tooltip>
-                  <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Info className="w-4 h-4 text-white/50 hover:text-white/80 cursor-help" />
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-white/50 hover:text-white/80 cursor-help" onClick={(e) => e.stopPropagation()} />
                   </TooltipTrigger>
                   <TooltipContent className="bg-[#2D1B4E] border border-white/20 text-white max-w-xs">
                     {t('arrTooltip', lang)}
@@ -72,14 +72,14 @@ export function TraderTableView({
                 {renderSortIcon('annualizedReturn')}
               </div>
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('sharpe', e)}
             >
               <div className="flex items-center justify-center gap-1">
                 <Tooltip>
-                  <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Info className="w-4 h-4 text-white/50 hover:text-white/80 cursor-help" />
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-white/50 hover:text-white/80 cursor-help" onClick={(e: React.MouseEvent) => e.stopPropagation()} />
                   </TooltipTrigger>
                   <TooltipContent className="bg-[#2D1B4E] border border-white/20 text-white max-w-xs">
                     {t('sharpeTooltip', lang)}
@@ -89,14 +89,14 @@ export function TraderTableView({
                 {renderSortIcon('sharpe')}
               </div>
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('maxDrawdown', e)}
             >
               <div className="flex items-center justify-center gap-1">
                 <Tooltip>
-                  <TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Info className="w-4 h-4 text-white/50 hover:text-white/80 cursor-help" />
+                  <TooltipTrigger asChild>
+                    <Info className="w-4 h-4 text-white/50 hover:text-white/80 cursor-help" onClick={(e: React.MouseEvent) => e.stopPropagation()} />
                   </TooltipTrigger>
                   <TooltipContent className="bg-[#2D1B4E] border border-white/20 text-white max-w-xs">
                     {t('mddTooltip', lang)}
@@ -106,15 +106,15 @@ export function TraderTableView({
                 {renderSortIcon('maxDrawdown')}
               </div>
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('balance', e)}
             >
               {t('balanceLabel', lang)}
               {renderSortIcon('balance')}
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('traderAge', e)}
             >
               {t('traderAgeLabel', lang)}
@@ -122,43 +122,43 @@ export function TraderTableView({
             </TableHead>
             <TableHead className="text-white/70 text-center text-base">{t('aiStrategy', lang)}</TableHead>
             <TableHead className="text-white/70 text-center text-base min-w-[240px]">{t('cumulativeReturns', lang)}</TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('timeInMarket', e)}
             >
               {t('timeInMarketLabel', lang)}
               {renderSortIcon('timeInMarket')}
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('followers', e)}
             >
               {t('followers', lang)}
               {renderSortIcon('followers')}
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('winRate', e)}
             >
               {t('winRateLabel', lang)}
               {renderSortIcon('winRate')}
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('avgHoldDays', e)}
             >
               {t('avgHoldDaysLabel', lang)}
               {renderSortIcon('avgHoldDays')}
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('avgTradesPerDay', e)}
             >
               {t('avgTradesPerDay', lang)}
               {renderSortIcon('avgTradesPerDay')}
             </TableHead>
-            <TableHead 
-              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base" 
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
               onClick={(e) => handleHeaderClick('lastTrade', e)}
             >
               {t('lastTrade', lang)}
@@ -171,8 +171,8 @@ export function TraderTableView({
             const isPositive = trader.allTimeReturn > 0;
             const isArrPositive = trader.annualizedReturn > 0;
             return (
-              <TableRow 
-                key={trader.id} 
+              <TableRow
+                key={trader.id}
                 className="border-white/20 hover:bg-white/5 cursor-pointer"
                 onClick={() => onViewDetails(trader)}
               >
@@ -215,7 +215,7 @@ export function TraderTableView({
                 <TableCell className="text-white text-center">
                   <div className="flex gap-1.5 flex-wrap justify-center">
                     {trader.aiTags[lang].map((tag, index) => (
-                      <span 
+                      <span
                         key={index}
                         className="bg-blue-500/20 text-blue-200 border border-blue-400/30 px-2 py-0.5 rounded whitespace-nowrap"
                         style={{ fontSize: '0.65rem' }}

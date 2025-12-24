@@ -51,9 +51,9 @@ const recentActivity = [
 
 export function PortfolioSidebar() {
   return (
-    <div 
+    <div
       className="w-80 p-6 border-l border-white/10"
-      style={{ 
+      style={{
         background: 'linear-gradient(180deg, rgba(45, 27, 78, 0.8) 0%, rgba(26, 11, 46, 0.9) 100%)',
         backdropFilter: 'blur(10px)'
       }}
@@ -61,8 +61,8 @@ export function PortfolioSidebar() {
       {/* Portfolio Overview */}
       <div className="mb-8">
         <h2 className="text-xl font-bold text-white mb-4">Your Portfolio</h2>
-        
-        <Card 
+
+        <Card
           className="p-4 mb-4 bg-white/10 backdrop-blur-md border-white/20"
           style={{ backdropFilter: 'blur(10px)' }}
         >
@@ -78,7 +78,7 @@ export function PortfolioSidebar() {
 
         {/* Portfolio Metrics */}
         <div className="grid grid-cols-2 gap-3 mb-4">
-          <Card 
+          <Card
             className="p-3 bg-white/10 backdrop-blur-md border-white/20"
             style={{ backdropFilter: 'blur(10px)' }}
           >
@@ -88,8 +88,8 @@ export function PortfolioSidebar() {
               <p className="text-lg font-bold text-white">8</p>
             </div>
           </Card>
-          
-          <Card 
+
+          <Card
             className="p-3 bg-white/10 backdrop-blur-md border-white/20"
             style={{ backdropFilter: 'blur(10px)' }}
           >
@@ -102,7 +102,7 @@ export function PortfolioSidebar() {
         </div>
 
         {/* Portfolio Chart */}
-        <Card 
+        <Card
           className="p-4 bg-white/10 backdrop-blur-md border-white/20"
           style={{ backdropFilter: 'blur(10px)' }}
         >
@@ -112,8 +112,8 @@ export function PortfolioSidebar() {
               <AreaChart data={portfolioData}>
                 <defs>
                   <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <Area
@@ -123,9 +123,9 @@ export function PortfolioSidebar() {
                   strokeWidth={2}
                   fill="url(#portfolioGradient)"
                 />
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 10, fill: '#9CA3AF' }}
                 />
@@ -145,7 +145,7 @@ export function PortfolioSidebar() {
 
         <div className="space-y-3">
           {recentActivity.map((activity) => (
-            <Card 
+            <Card
               key={activity.id}
               className="p-3 bg-white/10 backdrop-blur-md border-white/20 hover:bg-white/15 transition-colors"
               style={{ backdropFilter: 'blur(10px)' }}
@@ -157,18 +157,16 @@ export function PortfolioSidebar() {
                   <p className="text-xs text-gray-400">{activity.time}</p>
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-semibold ${
-                    activity.type === 'return' ? 'text-green-400' : 'text-blue-400'
-                  }`}>
+                  <p className={`text-sm font-semibold ${activity.type === 'return' ? 'text-green-400' : 'text-blue-400'
+                    }`}>
                     {activity.amount}
                   </p>
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs ${
-                      activity.type === 'return' 
-                        ? 'border-green-500/30 text-green-400' 
+                  <Badge
+                    variant="outline"
+                    className={`text-xs ${activity.type === 'return'
+                        ? 'border-green-500/30 text-green-400'
                         : 'border-blue-500/30 text-blue-400'
-                    }`}
+                      }`}
                   >
                     {activity.type}
                   </Badge>
@@ -180,7 +178,7 @@ export function PortfolioSidebar() {
       </div>
 
       {/* Quick Stats */}
-      <Card 
+      <Card
         className="p-4 bg-white/10 backdrop-blur-md border-white/20"
         style={{ backdropFilter: 'blur(10px)' }}
       >

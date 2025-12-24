@@ -22,7 +22,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
   const isPositive = trader.allTimeReturn > 0;
   const [isStrategyExpanded, setIsStrategyExpanded] = useState(false);
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
-  
+
   // Format address to 0x1234...5678
   const formatAddress = (address: string) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
@@ -39,7 +39,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    
+
     try {
       document.execCommand('copy');
       setShowCopiedTooltip(true);
@@ -49,12 +49,12 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
-    
+
     document.body.removeChild(textArea);
   };
 
   return (
-    <Card 
+    <Card
       className="p-5 bg-white/10 backdrop-blur-md border-white/20 transition-all duration-300 hover:shadow-lg hover:shadow-white/10"
       style={{ backdropFilter: 'blur(10px)' }}
     >
@@ -64,7 +64,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
           <p className="text-white/70 text-xs">{t('traderAddress', lang)}:</p>
           <Tooltip open={showCopiedTooltip}>
             <TooltipTrigger asChild>
-              <span 
+              <span
                 className="text-white font-mono text-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] inline-block"
                 onClick={handleCopyAddress}
               >
@@ -83,16 +83,16 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
 
       {/* Radar Chart Section - Centered Five-Dimensional Chart */}
       <div className="mb-5 flex justify-center">
-        <RadarChart 
-          metrics={trader.metrics} 
+        <RadarChart
+          metrics={trader.metrics}
           trader={trader}
-          lang={lang} 
+          lang={lang}
           size={320}
         />
       </div>
 
       {/* AI Tags - With Tooltip */}
-      <div 
+      <div
         className="-mt-3 mb-2 p-3 bg-blue-500/10 border border-blue-400/20 rounded-lg shadow-sm shadow-blue-500/10 transition-all duration-300"
         onMouseEnter={(e) => {
           const scrollDiv = e.currentTarget.querySelector('.ai-tags-scroll') as HTMLElement;

@@ -28,8 +28,6 @@ interface TraderDetailModalProps {
 export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, colorMode }: TraderDetailModalProps) {
   if (!trader) return null;
 
-  const displayReturn = metricOverride.returnRate ?? trader.allTimeReturn;
-  const isPositive = displayReturn > 0;
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('30D');
   const [detailTrades, setDetailTrades] = useState<Trade[]>(trader.trades);
   const [equitySeries, setEquitySeries] = useState(trader.pnlData);
@@ -106,9 +104,9 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
+      <DialogContent
         className="bg-[#1A0B2E] border-white/20 text-white max-w-5xl max-h-[90vh] overflow-y-auto"
-        style={{ 
+        style={{
           backdropFilter: 'blur(10px)',
           background: 'rgba(26, 11, 46, 0.95)'
         }}
@@ -128,7 +126,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
             <div className="flex-1">
               <p className="text-white/70 text-sm mb-1">{t('traderAddress', lang)}</p>
               <p className="text-white font-mono mb-4">{trader.address}</p>
-              
+
               <div className="flex flex-wrap gap-4">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-blue-400" />
@@ -141,14 +139,14 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                   <span className="text-white">{formatTraderAge(trader.traderAgeDays, lang)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {isPositive ? (
+                  {trader.allTimeReturn > 0 ? (
                     <TrendingUp className={`w-4 h-4 ${getValueColor(trader.allTimeReturn, colorMode)}`} />
                   ) : (
                     <TrendingDown className={`w-4 h-4 ${getValueColor(trader.allTimeReturn, colorMode)}`} />
                   )}
                   <span className="text-white/70 text-sm">{t('allTimeReturnLabel', lang)}:</span>
                   <span className={getValueColor(trader.allTimeReturn, colorMode)}>
-                    {isPositive ? '+' : ''}{trader.allTimeReturn.toFixed(1)}%
+                    {trader.allTimeReturn > 0 ? '+' : ''}{trader.allTimeReturn.toFixed(1)}%
                   </span>
                 </div>
               </div>
@@ -167,10 +165,10 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
             {/* Radar Chart */}
             <div className="p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg">
               <h3 className="text-white mb-4">{t('performanceMetrics', lang)}</h3>
-              <RadarChart 
-                metrics={trader.metrics} 
-                trader={trader} 
-                lang={lang} 
+              <RadarChart
+                metrics={trader.metrics}
+                trader={trader}
+                lang={lang}
                 size={250}
               />
             </div>
@@ -182,7 +180,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                 <div className="p-3 bg-white/5 rounded-lg">
                   <p className="text-white/70 text-sm mb-1">{t('allTimeReturnLabel', lang)}</p>
                   <p className={`text-xl ${getValueColor(metricOverride.returnRate ?? trader.allTimeReturn, colorMode)}`}>
-                    {isPositive ? '+' : ''}{(metricOverride.returnRate ?? trader.allTimeReturn).toFixed(1)}%
+                    {(metricOverride.returnRate ?? trader.allTimeReturn) > 0 ? '+' : ''}{(metricOverride.returnRate ?? trader.allTimeReturn).toFixed(1)}%
                   </p>
                 </div>
                 <div className="p-3 bg-white/5 rounded-lg">
@@ -221,7 +219,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
               <h3 className="text-white">{t('balanceChart', lang)}</h3>
               <MetricTabs value={timePeriod} onChange={setTimePeriod} />
             </div>
-            <CumulativeReturnsChart data={equitySeries} height={300} showBtcComparison={true} colorMode={colorMode} lang={lang} />
+            <CumulativeReturnsChart data={equitySeries} height={300} colorMode={colorMode} lang={lang} />
           </div>
 
           {/* Trade History */}
@@ -247,7 +245,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                       </TableCell>
                       <TableCell>
                         <Badge className={
-                          trade.type === 'long' 
+                          trade.type === 'long'
                             ? 'bg-green-500/20 text-green-300 border-green-400/30'
                             : 'bg-red-500/20 text-red-300 border-red-400/30'
                         }>
