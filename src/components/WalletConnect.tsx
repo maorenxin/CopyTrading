@@ -36,7 +36,7 @@ export function WalletConnect({ lang, web3Mock }: WalletConnectProps) {
       return;
     }
 
-    let cleanup: () => void = () => {};
+    let cleanup: () => void = () => { };
 
     const syncAccounts = async () => {
       const cachedAddress = localStorage.getItem('wallet_address') ?? '';
