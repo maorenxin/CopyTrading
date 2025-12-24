@@ -1,12 +1,11 @@
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Users, TrendingUp, TrendingDown, Clock, PieChart, Hourglass, Activity } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, PieChart, Hourglass, Activity, Target } from 'lucide-react';
 import { Trader, Language, ColorMode } from '../types/trader';
 import { RadarChart } from './RadarChart';
 import { CumulativeReturnsChart } from './CumulativeReturnsChart';
 import { t } from '../utils/translations';
-import { getTimeAgo } from '../utils/timeago';
 import { getValueColor } from '../utils/colorMode';
 import { useState } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
@@ -111,17 +110,11 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
         <p className="text-blue-300 text-xs mb-2">
           {lang === 'en' ? 'AI Investment Tag' : 'AI投资标签'}
         </p>
-        <div 
-          className="flex gap-1.5 overflow-x-auto pb-1 ai-tags-scroll"
-          style={{
-            scrollbarWidth: 'thin',
-            scrollbarColor: 'transparent transparent',
-          }}
-        >
-          {trader.aiTags[lang].map((tag, index) => (
-            <Badge 
+        <div className="flex flex-wrap gap-1.5">
+          {trader.aiTags[lang].slice(0, 5).map((tag, index) => (
+            <Badge
               key={index}
-              className="bg-blue-500/20 text-blue-200 border-blue-400/30 px-2 py-0.5 whitespace-nowrap shrink-0"
+              className="bg-blue-500/20 text-blue-200 border-blue-400/30 px-2 py-0.5 whitespace-nowrap"
               style={{ fontSize: '0.65rem' }}
             >
               {tag}
@@ -140,24 +133,22 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
 
       {/* All Metrics - Equal Priority */}
       <div className="grid grid-cols-2 gap-2 mb-4">
-        {/* Time in Market */}
-        <div className="p-2 bg-white/5 rounded-lg">
-          <div className="flex items-center gap-1 mb-1">
-            <PieChart className="w-3 h-3 text-purple-400" />
-            <p className="text-white/70 text-xs">{t('timeInMarketLabel', lang)}</p>
-          </div>
-          <p className="text-white text-sm">
-            {trader.timeInMarketPercent.toFixed(0)}%
-          </p>
-        </div>
-
         {/* Followers */}
         <div className="p-2 bg-white/5 rounded-lg">
           <div className="flex items-center gap-1 mb-1">
             <Users className="w-3 h-3 text-blue-400" />
             <p className="text-white/70 text-xs">{t('followers', lang)}</p>
           </div>
-          <p className="text-white text-sm">{trader.followerCount.toLocaleString()}</p>
+          <p className="text-white text-lg">{trader.followerCount.toLocaleString()}</p>
+        </div>
+
+        {/* Win Rate */}
+        <div className="p-2 bg-white/5 rounded-lg">
+          <div className="flex items-center gap-1 mb-1">
+            <Target className="w-3 h-3 text-green-400" />
+            <p className="text-white/70 text-xs">{t('winRateLabel', lang)}</p>
+          </div>
+          <p className="text-white text-lg">{trader.winRatePercent.toFixed(1)}%</p>
         </div>
 
         {/* All-Time Return */}
@@ -170,8 +161,19 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
             )}
             <p className="text-white/70 text-xs">{t('allTimeReturnLabel', lang)}</p>
           </div>
-          <p className={`text-sm ${getValueColor(trader.allTimeReturn, colorMode)}`}>
+          <p className={`text-lg ${getValueColor(trader.allTimeReturn, colorMode)}`}>
             {isPositive ? '+' : ''}{trader.allTimeReturn.toFixed(1)}%
+          </p>
+        </div>
+
+        {/* Time in Market */}
+        <div className="p-2 bg-white/5 rounded-lg">
+          <div className="flex items-center gap-1 mb-1">
+            <PieChart className="w-3 h-3 text-purple-400" />
+            <p className="text-white/70 text-xs">{t('timeInMarketLabel', lang)}</p>
+          </div>
+          <p className="text-white text-lg">
+            {trader.timeInMarketPercent.toFixed(0)}%
           </p>
         </div>
 
@@ -181,7 +183,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
             <Hourglass className="w-3 h-3 text-orange-400" />
             <p className="text-white/70 text-xs">{t('avgHoldDaysLabel', lang)}</p>
           </div>
-          <p className="text-white text-sm">
+          <p className="text-white text-lg">
             {trader.avgHoldDays.toFixed(1)}
           </p>
         </div>
@@ -192,16 +194,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
             <Activity className="w-3 h-3 text-blue-400" />
             <p className="text-white/70 text-xs">{t('avgTradesPerDay', lang)}</p>
           </div>
-          <p className="text-white text-sm">{trader.avgTradesPerDay.toFixed(1)}</p>
-        </div>
-
-        {/* Last Trade */}
-        <div className="p-2 bg-white/5 rounded-lg">
-          <div className="flex items-center gap-1 mb-1">
-            <Clock className="w-3 h-3 text-green-400" />
-            <p className="text-white/70 text-xs">{t('lastTrade', lang)}</p>
-          </div>
-          <p className="text-white text-sm">{getTimeAgo(trader.lastTradeTimestamp, lang)}</p>
+          <p className="text-white text-lg">{trader.avgTradesPerDay.toFixed(1)}</p>
         </div>
       </div>
 
