@@ -13,3 +13,5 @@ Thumbs.db
 .idea/
 .codex/
 .vite/
+.chrome-profile/
+.npm-cache/
