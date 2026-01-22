@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
+import { Slider } from './ui/slider';
 import { Trader, Language } from '../types/trader';
 import { t } from '../utils/translations';
+import { formatTraderAge } from '../utils/formatTraderAge';
 import { DollarSign, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -17,6 +20,10 @@ interface CopyTradeModalProps {
 export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModalProps) {
   const [amount, setAmount] = useState(100);
   const [customAmount, setCustomAmount] = useState('100');
+  const [copyInstantly, setCopyInstantly] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [stopLossEnabled, setStopLossEnabled] = useState(false);
+  const [stopLossPercent, setStopLossPercent] = useState(15);
   const maxBalance = 10000; // Mock max balance
 
   if (!trader) return null;
@@ -90,8 +97,8 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModal
                 </div>
               </div>
               <div>
-                <p className="text-white/70 text-xs">{t('winRateLabel', lang)}</p>
-                <p className="text-white">{trader.winRatePercent.toFixed(1)}%</p>
+                <p className="text-white/70 text-xs">{t('traderAgeLabel', lang)}</p>
+                <p className="text-white">{formatTraderAge(trader.traderAgeDays, lang)}</p>
               </div>
               <div>
                 <p className="text-white/70 text-xs">{t('followers', lang)}</p>
@@ -157,12 +164,69 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModal
             </p>
           </div>
 
-          {/* Summary */}
-          <div className="p-4 bg-blue-500/10 border border-blue-400/30 rounded-lg">
-            <div className="flex justify-between items-center">
-              <span className="text-white/70">{lang === 'en' ? 'Investment Amount' : '投资金额'}</span>
-              <span className="text-white text-lg">${amount.toLocaleString()} USDC</span>
+          <div className="p-4 bg-white/10 border border-white/20 rounded-lg space-y-4">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={copyInstantly}
+                onCheckedChange={(value) => setCopyInstantly(Boolean(value))}
+                className="border-white/50"
+              />
+              <span className="text-white text-sm">
+                {lang === 'en' ? 'Copy positions at market now' : '立刻市价复制仓位'}
+              </span>
             </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-white/80 text-sm">
+                {lang === 'en' ? 'Advanced options' : '高级选项'}
+              </span>
+              <Button
+                variant="ghost"
+                className="text-white/70 hover:text-white"
+                onClick={() => setShowAdvanced((prev) => !prev)}
+              >
+                {showAdvanced ? (lang === 'en' ? 'Hide' : '收起') : (lang === 'en' ? 'Show' : '展开')}
+              </Button>
+            </div>
+
+            {showAdvanced && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={stopLossEnabled}
+                    onCheckedChange={(value) => setStopLossEnabled(Boolean(value))}
+                    className="border-white/50"
+                  />
+                  <span className="text-white text-sm">
+                    {lang === 'en' ? 'Copy stop loss' : '跟单止损'}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm text-white/70">
+                    <span>{lang === 'en' ? 'Stop loss' : '止损比例'}</span>
+                    <span className="text-white">{stopLossPercent}%</span>
+                  </div>
+                  <Slider
+                    min={5}
+                    max={50}
+                    step={5}
+                    value={[stopLossPercent]}
+                    onValueChange={(value) => {
+                      if (value[0] !== undefined) {
+                        setStopLossPercent(value[0]);
+                      }
+                    }}
+                    className="data-[orientation=horizontal]:h-5"
+                    disabled={!stopLossEnabled}
+                  />
+                  <div className="flex justify-between text-xs text-white/50">
+                    <span>5%</span>
+                    <span>50%</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

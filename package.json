@@ -36,6 +36,8 @@
             "input-otp": "^1.4.2",
             "lucide-react": "^0.487.0",
             "next-themes": "^0.4.6",
+            "papaparse": "^5.5.3",
+            "pg": "^8.16.3",
             "react": "^18.3.1",
             "react-day-picker": "^8.10.1",
             "react-dom": "^18.3.1",
@@ -44,18 +46,24 @@
             "recharts": "^2.15.2",
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
+            "undici": "^5.28.4",
             "vaul": "^1.1.2"
       },
       "devDependencies": {
             "@types/node": "^20.10.0",
+            "@types/papaparse": "^5.5.2",
             "@types/react": "^19.2.7",
             "@types/react-dom": "^19.2.3",
             "@vitejs/plugin-react-swc": "^3.10.2",
+            "ts-node": "^10.9.2",
             "typescript": "^5.9.3",
             "vite": "6.3.5"
       },
       "scripts": {
             "dev": "vite",
-            "build": "vite build"
+            "build": "vite build",
+            "vault:sync:local": "node server/scripts/local-vault-sync.js",
+            "vault:scrape:local": "node server/scripts/local-vaults-scrape.js",
+            "vault:trades:local": "node server/scripts/local-vault-trades.js"
       }
 }

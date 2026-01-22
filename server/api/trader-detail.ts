@@ -13,9 +13,23 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-function buildEquitySeries(balance: number, returnRate: number) {
+const resolveWindowDays = (window: string) => {
+  switch (window) {
+    case '7d':
+      return 7;
+    case '30d':
+      return 30;
+    case '90d':
+      return 90;
+    case 'all':
+    default:
+      return 180;
+  }
+};
+
+function buildEquitySeries(balance: number, returnRate: number, window: string) {
   const points: { timestamp: string; vault_equity: number; btc_equity: number }[] = [];
-  const days = 30;
+  const days = resolveWindowDays(window);
   const now = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
   const start = balance / (1 + returnRate / 100);
@@ -129,7 +143,7 @@ export const traderDetailRoutes: RouteDefinition[] = [
       const balance = toNumber(traderRow?.balance_usdc, 1000);
       const returnRate = toNumber(metricRow?.return_rate ?? traderRow?.all_time_return, 0);
 
-      return { points: buildEquitySeries(balance, returnRate) };
+      return { points: buildEquitySeries(balance, returnRate, window) };
     },
   },
 ];

@@ -15,3 +15,13 @@ Thumbs.db
 .vite/
 .chrome-profile/
 .npm-cache/
+
+# 可以后续补充的vault的相关数据
+VAULTS.csv
+vault_funding_data/
+vault_nonfunding_ledger/
+vault_trades_data/
+vault_quantstat/
+
+# 可以后续补充的crypto_data
+crypto_data/

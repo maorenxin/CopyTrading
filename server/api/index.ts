@@ -6,6 +6,8 @@ import { telegramWebhookRoutes } from "./telegram";
 import { telegramBindRoutes } from "./telegram-bind";
 import { telegramBindConfirmRoutes } from "./telegram-bind-confirm";
 import { portfolioRoutes } from "./portfolio";
+import { vaultRoutes } from "./vaults";
+import { syncRunRoutes } from "./sync-runs";
 
 export function buildApiRouter(): ApiRouter {
   const router = new ApiRouter();
@@ -18,6 +20,8 @@ export function buildApiRouter(): ApiRouter {
     ...telegramBindRoutes,
     ...telegramBindConfirmRoutes,
     ...portfolioRoutes,
+    ...vaultRoutes,
+    ...syncRunRoutes,
   ].forEach((route) => router.register(route));
 
   return router;

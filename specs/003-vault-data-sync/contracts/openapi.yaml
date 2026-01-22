@@ -1,0 +1,277 @@
+openapi: 3.0.3
+info:
+  title: Vault 数据同步 API
+  version: 0.1.0
+servers:
+  - url: https://api.local
+paths:
+  /vaults/sync:
+    post:
+      summary: 触发 Vault 数据同步
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourcePreference:
+                  type: string
+                  description: 数据源偏好（official/web/fallback）
+      responses:
+        "200":
+          description: 同步任务已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  syncRunId:
+                    type: string
+                  status:
+                    type: string
+  /vaults:
+    get:
+      summary: 获取 Vault 列表
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vault 列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Vault"
+                  nextCursor:
+                    type: string
+  /vaults/{vaultId}:
+    get:
+      summary: 获取 Vault 详情
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vault 详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vault"
+  /vaults/{vaultId}/trades:
+    get:
+      summary: 获取 Vault 历史成交
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成交列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VaultTrade"
+                  nextCursor:
+                    type: string
+  /vaults/{vaultId}/positions:
+    get:
+      summary: 获取 Vault 当前仓位
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 仓位列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VaultPosition"
+  /vaults/{vaultId}/depositors:
+    get:
+      summary: 获取 Vault 存款人
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 存款人列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VaultDepositor"
+  /sync-runs:
+    get:
+      summary: 获取同步记录
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 同步记录列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SyncRun"
+components:
+  schemas:
+    Vault:
+      type: object
+      properties:
+        id:
+          type: string
+        vaultAddress:
+          type: string
+        name:
+          type: string
+        managerAddress:
+          type: string
+        status:
+          type: string
+        tvlUsdc:
+          type: number
+        allTimeReturn:
+          type: number
+        sharpe:
+          type: number
+        maxDrawdown:
+          type: number
+        lastTradeAt:
+          type: string
+          format: date-time
+        syncedAt:
+          type: string
+          format: date-time
+    VaultTrade:
+      type: object
+      properties:
+        id:
+          type: string
+        vaultId:
+          type: string
+        txHash:
+          type: string
+        side:
+          type: string
+        price:
+          type: number
+        size:
+          type: number
+        pnl:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+    VaultPosition:
+      type: object
+      properties:
+        id:
+          type: string
+        vaultId:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+        leverage:
+          type: number
+        quantity:
+          type: number
+        entryPrice:
+          type: number
+        markPrice:
+          type: number
+        positionValue:
+          type: number
+        roePercent:
+          type: number
+    VaultDepositor:
+      type: object
+      properties:
+        id:
+          type: string
+        vaultId:
+          type: string
+        depositorAddress:
+          type: string
+        amountUsdc:
+          type: number
+        sharePercent:
+          type: number
+    SyncRun:
+      type: object
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        vaultCount:
+          type: integer
+        successCount:
+          type: integer
+        failedVaults:
+          type: array
+          items:
+            type: string
+        note:
+          type: string

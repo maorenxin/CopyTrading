@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+import argparse
 import math
 import os
+import subprocess
 from pathlib import Path
 
 import pandas as pd
@@ -11,7 +13,8 @@ import quantstats as qs
 _TIME_KEYS = {"time", "timestamp", "timems", "timemillis", "time_ms", "ts"}
 _RESAMPLE_TZ = os.getenv("VAULT_RESAMPLE_TZ", "Asia/Shanghai")
 _COIN_SYMBOL_OVERRIDES = {
-    "KSHIB": "1000SHIBUSDT",
+    "KPEPE": "kPEPEUSDT",
+    "KBONK": "kBONKUSDT",
 }
 
 
@@ -67,11 +70,12 @@ def _ensure_resample_tz(index: pd.DatetimeIndex) -> pd.DatetimeIndex:
 
 
 # === 读取 VAULTS.csv ===
-def load_vault_addresses(vaults_csv: Path) -> list[str]:
+def load_vault_addresses(vaults_csv: Path, relationship_type: str | None = None) -> list[str]:
     """
     读取 VAULTS.csv 中的 vault 地址。
     参数:
         vaults_csv: VAULTS.csv 路径。
+        relationship_type: 需要筛选的 relationshipType。
     返回:
         vault 地址列表。
     """
@@ -85,20 +89,20 @@ def load_vault_addresses(vaults_csv: Path) -> list[str]:
     if df.empty:
         return []
     addr_col = None
+    relation_col = None
     for name in ["vaultAddress", "vault_address", "vault"]:
         if name in df.columns:
             addr_col = name
             break
+    for name in ["relationshipType", "relationshiptype", "relationship_type"]:
+        if name in df.columns:
+            relation_col = name
+            break
     if not addr_col:
         return []
-    addrs = (
-        df[addr_col]
-        .dropna()
-        .astype(str)
-        .str.strip()
-        .str.lower()
-        .tolist()
-    )
+    if relationship_type and relation_col:
+        df = df[df[relation_col].astype(str).str.lower() == relationship_type.lower()]
+    addrs = df[addr_col].dropna().astype(str).str.strip().str.lower().tolist()
     return [addr for addr in addrs if addr]
 
 
@@ -319,7 +323,11 @@ def _resolve_price_path(price_dir: Path, coin: str, price_interval: str) -> Path
     if not symbol.endswith("USDT"):
         symbol = f"{symbol}USDT"
     suffix = price_interval.lower()
-    return price_dir / f"{symbol.lower()}_{suffix}.csv"
+    base = f"{symbol.lower()}_{suffix}"
+    hyper_path = price_dir / f"{base}_hyperliquid.csv"
+    if hyper_path.exists():
+        return hyper_path
+    return price_dir / f"{base}.csv"
 
 
 def load_hourly_price_series(csv_path: Path) -> pd.Series:
@@ -350,11 +358,122 @@ def load_hourly_price_series(csv_path: Path) -> pd.Series:
     out = df.loc[time_ms.notna()].copy()
     if out.empty:
         return pd.Series(dtype=float)
-    out["time"] = _to_resample_time_from_ms(time_ms.loc[out.index])
+    out["time"] = _to_resample_time_from_ms(time_ms.loc[out.index]).dt.floor("h")
     out["price"] = prices.loc[out.index]
-    series = out.set_index("time")["price"].sort_index()
+    series = out.groupby("time")["price"].last().sort_index()
     series = series.resample("h").ffill()
     return series
+
+
+# === 下载价格数据 ===
+def download_crypto_prices(
+    coins: list[str],
+    price_dir: Path,
+    price_interval: str,
+    start_time_ms: int | None,
+) -> bool:
+    """
+    触发币种价格下载流程。
+    参数:
+        coins: 需要下载的币种列表。
+        price_dir: 价格数据目录。
+        price_interval: 价格周期。
+        start_time_ms: 起始毫秒时间戳。
+    返回:
+        是否执行成功。
+    """
+    if not coins:
+        return True
+    script_path = Path(__file__).resolve().parents[1] / "services" / "crypto-price-downloader.ts"
+    if not script_path.exists():
+        print(f"[warn] missing downloader: {script_path}")
+        return False
+    price_dir.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env["CRYPTO_COINS"] = ",".join(sorted(set(coins)))
+    env["CRYPTO_INTERVAL"] = price_interval
+    env["CRYPTO_DATA_DIR"] = str(price_dir)
+    if start_time_ms is not None:
+        env["CRYPTO_DATA_START_TIME"] = str(start_time_ms)
+    try:
+        subprocess.run(
+            ["ts-node", str(script_path)],
+            check=True,
+            env=env,
+        )
+        return True
+    except Exception as exc:
+        print(f"[warn] crypto download failed: {exc}")
+        return False
+
+
+def ensure_price_data(
+    coins: list[str],
+    price_dir: Path,
+    price_interval: str,
+    start_time_ms: int | None,
+) -> None:
+    """
+    确保币种价格文件存在，不存在则触发下载。
+    参数:
+        coins: 需要检查的币种列表。
+        price_dir: 价格数据目录。
+        price_interval: 价格周期。
+        start_time_ms: 起始毫秒时间戳。
+    返回:
+        无。
+    """
+    missing = []
+    for coin in coins:
+        upper = str(coin).strip().upper()
+        symbol = _COIN_SYMBOL_OVERRIDES.get(upper, upper)
+        if not symbol.endswith("USDT"):
+            symbol = f"{symbol}USDT"
+        suffix = price_interval.lower()
+        binance_path = price_dir / f"{symbol.lower()}_{suffix}_binance.csv"
+        hyper_path = price_dir / f"{symbol.lower()}_{suffix}_hyperliquid.csv"
+        if binance_path.exists() and not load_hourly_price_series(binance_path).empty:
+            continue
+        if hyper_path.exists() and not load_hourly_price_series(hyper_path).empty:
+            continue
+        missing.append(coin)
+    if missing:
+        print(f"[info] missing price files, start download: {', '.join(missing)}")
+        download_crypto_prices(missing, price_dir, price_interval, start_time_ms)
+
+
+# === 基准收益率 ===
+def build_benchmark_returns(
+    price_dir: Path, price_interval: str, freq: str, target_index: pd.DatetimeIndex | None = None
+) -> pd.Series:
+    """
+    构造 BTCUSDT 买入持有的基准收益率序列。
+    参数:
+        price_dir: 价格数据目录。
+        price_interval: 价格周期（如 1h）。
+        freq: 汇总频率（h 或 d）。
+        target_index: 对齐目标索引（可选）。
+    返回:
+        基准收益率序列。
+    """
+    price_path = _resolve_price_path(price_dir, "BTC", price_interval)
+    price_series = load_hourly_price_series(price_path)
+    if price_series.empty:
+        return pd.Series(dtype=float)
+    price_series.index = _ensure_resample_tz(price_series.index)
+    resample_freq = _normalize_freq(freq)
+    if resample_freq != "h":
+        price_series = price_series.resample(resample_freq).last().ffill()
+    returns = price_series / price_series.shift(1) - 1
+    returns = returns.replace([math.inf, -math.inf], 0.0).fillna(0.0)
+    if target_index is not None and len(target_index) > 0:
+        target_index = pd.DatetimeIndex(target_index)
+        if target_index.tz is not None:
+            target_index = target_index.tz_localize(None)
+        if returns.index.tz is not None:
+            returns.index = returns.index.tz_localize(None)
+        returns = returns.reindex(target_index, fill_value=0.0)
+    return returns
 
 
 # === NAV 计算 ===
@@ -364,6 +483,7 @@ def build_nav_series(
     ledger_df: pd.DataFrame,
     price_dir: Path,
     price_interval: str,
+    start_time: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     """
     构建逐小时 NAV 及过程数据。
@@ -373,6 +493,7 @@ def build_nav_series(
         ledger_df: 充值/提现现金流。
         price_dir: 价格数据目录。
         price_interval: 价格周期。
+        start_time: 计算起点时间（时区需与配置一致）。
     返回:
         包含 nav、现金流与 pnl 的 DataFrame。
     """
@@ -393,15 +514,24 @@ def build_nav_series(
         print(f"[warn] missing price data for coins: {', '.join(missing)}")
         return pd.DataFrame()
 
-    price_df = pd.concat(price_map, axis=1).sort_index().ffill()
+    price_df = pd.concat(price_map, axis=1).sort_index()
     if price_df.empty:
         return pd.DataFrame()
-    start_time = price_df.apply(lambda s: s.first_valid_index()).max()
-    if start_time is None or pd.isna(start_time):
-        return pd.DataFrame()
-    price_df = price_df.loc[price_df.index >= start_time]
     price_df.index = _ensure_resample_tz(price_df.index)
-    index = price_df.index
+    price_start = price_df.index.min()
+    price_end = price_df.index.max()
+    if price_start is None or pd.isna(price_start) or price_end is None or pd.isna(price_end):
+        return pd.DataFrame()
+    if start_time is not None and pd.notna(start_time):
+        start_time = _ensure_resample_tz(pd.DatetimeIndex([start_time]))[0]
+        aligned_start = start_time.ceil("h")
+        range_start = max(price_start, aligned_start)
+    else:
+        range_start = price_start
+    if range_start > price_end:
+        return pd.DataFrame()
+    index = pd.date_range(start=range_start, end=price_end, freq="h", tz=_RESAMPLE_TZ)
+    price_df = price_df.reindex(index).ffill()
 
     trade_rows = trades_df.to_dict("records")
     fund_rows = funding_df.to_dict("records") if not funding_df.empty else []
@@ -464,12 +594,18 @@ def build_nav_series(
             ledger_sum += amount
 
         unrealized = 0.0
+        has_position = False
         for coin in coins:
             size = positions.get(coin, 0.0)
             if size == 0:
                 continue
+            has_position = True
             avg_entry = cost_basis.get(coin, 0.0) / size
-            mark_price = price_df.at[ts, coin]
+            price_ts = ts.floor("h")
+            if price_ts in price_df.index:
+                mark_price = price_df.at[price_ts, coin]
+            else:
+                mark_price = price_df[coin].asof(price_ts)
             if pd.isna(mark_price):
                 continue
             unrealized += size * (float(mark_price) - avg_entry)
@@ -484,6 +620,7 @@ def build_nav_series(
                 "closed_pnl": closed_pnl_sum,
                 "fee": fee_sum,
                 "unrealized_pnl": unrealized,
+                "in_market": 1 if has_position else 0,
             }
         )
         prev_ts = ts
@@ -593,176 +730,100 @@ def compute_mdd(nav_series: pd.Series) -> float:
     return float(drawdown.min())
 
 
-# === 验证用样本数据 ===
-_B150_SAMPLE_NAV = {
-    "2025-10-01": 0.00,
-    "2025-10-02": 616090.05,
-    "2025-10-03": 799747.27,
-    "2025-10-04": 843627.78,
-    "2025-10-05": 921015.90,
-    "2025-10-06": 936666.90,
-    "2025-10-07": 941019.35,
-    "2025-10-08": 1055026.59,
-    "2025-10-09": 1215882.09,
-    "2025-10-10": 1296719.34,
-    "2025-10-11": 1344127.58,
-    "2025-10-12": 1366148.36,
-    "2025-10-13": 1565677.76,
-    "2025-10-14": 1481774.31,
-    "2025-10-15": 1427940.35,
-    "2025-10-16": 1461057.11,
-    "2025-10-17": 1499373.15,
-    "2025-10-18": 1498236.92,
-    "2025-10-19": 1465269.99,
-    "2025-10-20": 1434167.35,
-    "2025-10-21": 1411089.75,
-    "2025-10-22": 1470905.61,
-    "2025-10-23": 1444073.10,
-    "2025-10-24": 1434496.81,
-    "2025-10-25": 1438333.48,
-    "2025-10-26": 1410401.19,
-    "2025-10-27": 1386277.92,
-    "2025-10-28": 1347177.02,
-    "2025-10-29": 1398629.43,
-    "2025-10-30": 1435814.18,
-    "2025-10-31": 1427595.67,
-    "2025-11-01": 1414312.33,
-    "2025-11-02": 1424000.75,
-    "2025-11-03": 1466772.71,
-    "2025-11-04": 1538008.26,
-    "2025-11-05": 1509381.42,
-    "2025-11-06": 1568568.43,
-    "2025-11-07": 1563790.87,
-    "2025-11-08": 1555132.87,
-    "2025-11-09": 1524798.32,
-    "2025-11-10": 1508182.74,
-    "2025-11-11": 1536548.88,
-    "2025-11-12": 1567834.59,
-    "2025-11-13": 1598723.27,
-    "2025-11-14": 1645744.53,
-    "2025-11-15": 1640957.82,
-    "2025-11-16": 1755345.62,
-    "2025-11-17": 1766896.91,
-    "2025-11-18": 1958580.83,
-    "2025-11-19": 2066871.98,
-    "2025-11-20": 2076449.24,
-    "2025-11-21": 2117003.28,
-    "2025-11-22": 2145033.00,
-    "2025-11-23": 2117082.54,
-    "2025-11-24": 2140655.31,
-    "2025-11-25": 2160180.38,
-    "2025-11-26": 2178358.34,
-    "2025-11-27": 2114288.09,
-    "2025-11-28": 2148669.48,
-    "2025-11-29": 2170045.34,
-    "2025-11-30": 2159662.25,
-    "2025-12-01": 2385237.91,
-    "2025-12-02": 2232356.83,
-    "2025-12-03": 2180303.87,
-    "2025-12-04": 2179857.01,
-    "2025-12-05": 2274650.34,
-    "2025-12-06": 2249276.57,
-    "2025-12-07": 2237383.62,
-    "2025-12-08": 2238859.91,
-    "2025-12-09": 2125207.84,
-    "2025-12-10": 2193656.99,
-    "2025-12-11": 2271183.96,
-    "2025-12-12": 2257832.93,
-    "2025-12-13": 2268121.30,
-    "2025-12-14": 2283972.01,
-    "2025-12-15": 2355873.78,
-    "2025-12-16": 2346708.61,
-    "2025-12-17": 2383040.18,
-    "2025-12-18": 2440299.14,
-    "2025-12-19": 2455132.20,
-    "2025-12-20": 2465845.42,
-    "2025-12-21": 2474540.68,
-    "2025-12-22": 2520194.39,
-    "2025-12-23": 2638461.19,
-    "2025-12-24": 2767143.16,
-    "2025-12-25": 2829908.39,
-    "2025-12-26": 2886931.84,
-    "2025-12-27": 3015476.67,
-    "2025-12-28": 3000654.87,
-    "2025-12-29": 3006814.86,
-    "2025-12-30": 2972520.36,
-    "2025-12-31": 3008215.90,
-    "2026-01-01": 2981139.87,
-    "2026-01-02": 2901978.64,
-    "2026-01-03": 2945034.72,
-    "2026-01-04": 3065964.25,
-    "2026-01-05": 3280147.66,
-    "2026-01-06": 3342106.14,
-    "2026-01-07": 3370711.46,
-    "2026-01-08": 3339036.37,
-    "2026-01-09": 3405061.92,
-    "2026-01-10": 3321625.48,
-    "2026-01-11": 3370530.00,
-    "2026-01-12": 3460623.66,
-    "2026-01-13": 3569231.76,
-    "2026-01-14": 3899318.53,
-    "2026-01-15": 3850354.69,
-    "2026-01-16": 3696625.67,
-    "2026-01-17": 3733167.29,
-}
-
-
-def validate_b150(nav_series: pd.Series, freq: str):
+def compute_avg_hold_days(nav_df: pd.DataFrame) -> float:
     """
-    用 b150 样本 NAV 做校验。
+    计算平均持仓天数（按连续有仓位区间）。
     参数:
-        nav_series: 计算得到的 NAV 序列。
-        freq: 汇总频率。
+        nav_df: 逐小时 NAV 明细。
+    返回:
+        平均持仓天数。
+    """
+    if nav_df is None or nav_df.empty or "in_market" not in nav_df.columns:
+        return 0.0
+    series = nav_df["in_market"].fillna(0).astype(int)
+    if series.empty:
+        return 0.0
+    durations = []
+    in_pos = False
+    start_time = None
+    for ts, flag in series.items():
+        if flag and not in_pos:
+            in_pos = True
+            start_time = ts
+        elif not flag and in_pos:
+            if start_time is not None:
+                durations.append((ts - start_time).total_seconds())
+            in_pos = False
+            start_time = None
+    if in_pos and start_time is not None:
+        durations.append((series.index[-1] - start_time).total_seconds())
+    if not durations:
+        return 0.0
+    return float(sum(durations) / len(durations) / 86400.0)
+
+
+def _extract_metrics_value(metrics_df: pd.DataFrame, keys: set[str]) -> float | None:
+    """
+    从 quantstats 指标表中提取指定指标数值。
+    参数:
+        metrics_df: quantstats 输出的指标表。
+        keys: 目标指标的规范化名称集合。
+    返回:
+        指标数值，找不到返回 None。
+    """
+    if metrics_df is None or metrics_df.empty:
+        return None
+    for idx in metrics_df.index:
+        if _normalize_column(idx) in keys:
+            try:
+                return float(metrics_df.loc[idx].iloc[0])
+            except Exception:
+                return None
+    return None
+
+
+def upsert_summary_row(summary_path: Path, row: dict) -> None:
+    """
+    写入单条汇总数据，存在则覆盖。
+    参数:
+        summary_path: 汇总 CSV 路径。
+        row: 当前 vault 的汇总数据。
     返回:
         无。
     """
-    if nav_series.empty:
-        return
-    if _normalize_freq(freq) != "d":
-        return
-    nav_local = nav_series.copy()
-    if nav_local.index.tz is not None:
-        nav_local.index = nav_local.index.tz_localize(None)
-    nav_by_date = nav_local.groupby(nav_local.index.date).last()
-    if nav_by_date.empty:
-        return
+    if summary_path.exists():
+        try:
+            existing = pd.read_csv(summary_path)
+        except Exception:
+            existing = pd.DataFrame()
+    else:
+        existing = pd.DataFrame()
+    if not existing.empty and "vault_address" in existing.columns:
+        existing = existing[existing["vault_address"] != row.get("vault_address")]
+    updated = pd.concat([existing, pd.DataFrame([row])], ignore_index=True)
+    updated.to_csv(summary_path, index=False)
 
-    sample = pd.Series(_B150_SAMPLE_NAV)
-    sample.index = pd.to_datetime(sample.index, errors="coerce")
-    sample = sample.dropna()
-    if sample.empty:
-        return
-
-    merged = pd.DataFrame(
-        {
-            "calc": nav_by_date.reindex(sample.index.date).values,
-            "sample": sample.values,
-        },
-        index=sample.index,
-    ).dropna()
-    if merged.empty:
-        return
-
-    diff = (merged["calc"] - merged["sample"]).abs()
-    print(
-        f"[info] b150 nav validation count={len(merged)} "
-        f"avg_abs_diff={diff.mean():.2f} max_abs_diff={diff.max():.2f}"
-    )
-    sample_nav = sample.copy()
-    sample_nav.index = pd.to_datetime(sample_nav.index, errors="coerce")
-    sample_nav = sample_nav.dropna()
-    sample_returns = compute_returns(sample_nav)
-    sample_sharpe_daily = compute_sharpe(sample_returns, "d", False)
-    sample_sharpe_annual = compute_sharpe(sample_returns, "d", True)
-    sample_mdd = compute_mdd(sample_nav)
-    print(
-        f"[info] b150 sample sharpe_daily={sample_sharpe_daily:.3f} "
-        f"sharpe_annual={sample_sharpe_annual:.3f} mdd={sample_mdd:.2%}"
-    )
 
 
 # === 主流程 ===
-# === 主流程 ===
+def parse_args() -> argparse.Namespace:
+    """
+    解析命令行参数。
+    参数:
+        无。
+    返回:
+        参数命名空间。
+    """
+    parser = argparse.ArgumentParser(description="vault quantstats 计算工具")
+    parser.add_argument("vault_address", nargs="?", default="0xb1505ad1a4c7755e0eb236aa2f4327bfc3474768", help="vault 地址")
+    parser.add_argument(
+        "--no-download-prices",
+        action="store_true",
+        help="缺少价格数据时不自动下载",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     """
     主流程入口，生成 NAV、收益率与量化指标。
@@ -779,17 +840,13 @@ def main() -> None:
     price_interval = os.getenv("VAULT_PRICE_INTERVAL", "1h")
     out_dir = Path(os.getenv("VAULT_QUANTSTAT_DIR", root_dir / "vault_quantstat"))
     vaults_csv = Path(os.getenv("VAULTS_CSV_PATH", root_dir / "VAULTS.csv"))
-    target_vault = os.getenv("VAULT_TARGET_ADDRESS", "").strip().lower()
+    args = parse_args()
+    target_vault = str(args.vault_address or "").strip().lower()
+    download_prices = not bool(args.no_download_prices)
     freq = os.getenv("VAULT_QUANTSTAT_FREQ", "D")
     freq = str(freq).strip().upper() or "D"
-    annualize_sharpe = str(os.getenv("VAULT_SHARPE_ANNUALIZE", "1")).lower() in {
-        "1",
-        "true",
-        "yes",
-    }
-
     out_dir.mkdir(parents=True, exist_ok=True)
-    vault_addresses = load_vault_addresses(vaults_csv)
+    vault_addresses = load_vault_addresses(vaults_csv, "normal")
     create_time_map = load_vault_create_time_map(vaults_csv)
     if target_vault:
         vault_addresses = [addr for addr in vault_addresses if addr == target_vault]
@@ -797,16 +854,13 @@ def main() -> None:
         print("[warn] no vaults to process")
         return
 
-    summary_rows = []
-
-    vault_addresses = ['0xb1505ad1a4c7755e0eb236aa2f4327bfc3474768']
+    summary_path = root_dir / "vault_quantstat.csv"
 
     for vault_address in vault_addresses:
         trade_path = trades_dir / f"{vault_address}.csv"
         trades_df = load_trades(trade_path)
         if trades_df.empty:
             print(f"[warn] skip {vault_address}, empty trades")
-            summary_rows.append({"vault_address": vault_address})
             continue
 
         funding_path = funding_dir / f"{vault_address}.csv"
@@ -814,38 +868,120 @@ def main() -> None:
         funding_df = load_cashflows(funding_path)
         ledger_df = load_cashflows(ledger_path)
 
-        nav_hourly = build_nav_series(
-            trades_df, funding_df, ledger_df, price_dir, price_interval
-        )
-        if nav_hourly.empty:
-            print(f"[warn] skip {vault_address}, empty nav")
-            summary_rows.append({"vault_address": vault_address})
-            continue
-
+        coins = sorted(trades_df["coin"].dropna().unique().tolist())
+        create_time = None
         create_time_ms = create_time_map.get(vault_address)
         if create_time_ms:
             create_time = pd.to_datetime(create_time_ms, unit="ms", utc=True).tz_convert(
                 _RESAMPLE_TZ
             )
+
+        download_start_ms = None
+        if create_time_ms:
+            download_start_ms = int(create_time_ms)
+        else:
+            min_trade_time = trades_df["time"].min()
+            if pd.notna(min_trade_time):
+                download_start_ms = int(min_trade_time.tz_convert("UTC").timestamp() * 1000)
+
+        if download_prices:
+            ensure_price_data(coins, price_dir, price_interval, download_start_ms)
+
+        nav_hourly = build_nav_series(
+            trades_df,
+            funding_df,
+            ledger_df,
+            price_dir,
+            price_interval,
+            create_time,
+        )
+        if nav_hourly.empty:
+            print(f"[warn] skip {vault_address}, empty nav")
+            continue
+
+        if create_time is not None:
             nav_hourly = nav_hourly.loc[nav_hourly.index >= create_time]
 
         nav_hourly = nav_hourly.dropna()
         if nav_hourly.empty:
             print(f"[warn] skip {vault_address}, empty nav after trim")
-            summary_rows.append({"vault_address": vault_address})
             continue
 
         nav_frame = resample_nav_frame(nav_hourly, freq)
         nav_frame = nav_frame.dropna()
         if nav_frame.empty:
             print(f"[warn] skip {vault_address}, empty nav after resample")
-            summary_rows.append({"vault_address": vault_address})
             continue
 
         nav_series = nav_frame["nav"]
         returns = compute_returns(nav_series)
-        sharpe = compute_sharpe(returns, freq, annualize_sharpe)
-        mdd = compute_mdd(nav_series)
+
+        returns_for_metrics = returns.copy()
+        if returns_for_metrics.index.tz is not None:
+            returns_for_metrics.index = returns_for_metrics.index.tz_localize(None)
+
+        benchmark_returns = build_benchmark_returns(
+            price_dir, price_interval, freq, returns_for_metrics.index
+        )
+
+        periods_per_year = 365 if _normalize_freq(freq) == "d" else 24 * 365
+        metrics_mode = os.getenv("VAULT_QS_METRICS_MODE", "full").strip().lower() or "full"
+        try:
+            qs.reports.metrics(
+                returns_for_metrics,
+                display=True,
+                mode=metrics_mode,
+                periods_per_year=periods_per_year,
+            )
+        except Exception as exc:
+            print(f"[warn] metrics display failed for {vault_address}: {exc}")
+
+        metrics_df = qs.reports.metrics(
+            returns_for_metrics,
+            display=False,
+            mode=metrics_mode,
+            periods_per_year=periods_per_year,
+        )
+
+        annualized_return = _extract_metrics_value(metrics_df, {"cagr"})
+        sharpe = _extract_metrics_value(metrics_df, {"sharpe"})
+        mdd = _extract_metrics_value(metrics_df, {"maxdrawdown"})
+        win_rate = _extract_metrics_value(metrics_df, {"windays"})
+        time_in_market = _extract_metrics_value(metrics_df, {"timeinmarket"})
+
+        if annualized_return is None:
+            try:
+                annualized_return = float(
+                    qs.stats.cagr(returns_for_metrics, periods=periods_per_year)
+                )
+            except Exception:
+                annualized_return = 0.0
+        if sharpe is None:
+            try:
+                sharpe = float(
+                    qs.stats.sharpe(
+                        returns_for_metrics, periods=periods_per_year, annualize=True
+                    )
+                )
+            except Exception:
+                sharpe = 0.0
+        if mdd is None:
+            mdd = compute_mdd(nav_series)
+        if win_rate is None:
+            try:
+                win_rate = float(qs.stats.win_rate(returns_for_metrics))
+            except Exception:
+                win_rate = 0.0
+        if time_in_market is None:
+            time_in_market = 0.0
+
+        avg_hold_days = compute_avg_hold_days(nav_hourly)
+        trader_age_hours = 0.0
+        if create_time is not None:
+            trader_age_hours = (
+                pd.Timestamp.now(tz=_RESAMPLE_TZ) - create_time
+            ).total_seconds() / 3600.0
+        balance = float(nav_series.iloc[-1]) if not nav_series.empty else 0.0
 
         nav_output = out_dir / f"{vault_address}.nav.csv"
         returns_output = out_dir / f"{vault_address}.returns.csv"
@@ -861,40 +997,38 @@ def main() -> None:
             returns_out.index = returns_out.index.tz_localize(None)
         returns_out.to_frame("return").reset_index().to_csv(returns_output, index=False)
 
-        periods_per_year = 365 if _normalize_freq(freq) == "d" else 24 * 365
-        try:
-            qs.reports.html(
-                returns,
-                output=str(html_output),
-                title=f"Vault NAV {vault_address}",
-                periods_per_year=periods_per_year,
-            )
-        except Exception as exc:
-            print(f"[warn] report failed for {vault_address}: {exc}")
-
-        summary_rows.append(
-            {
-                "vault_address": vault_address,
-                "nav_start": float(nav_series.iloc[0]),
-                "nav_end": float(nav_series.iloc[-1]),
-                "sharpe": sharpe,
-                "mdd": mdd,
-                "freq": freq,
-            }
+        qs.reports.html(
+            returns_for_metrics,
+            benchmark=benchmark_returns,
+            output=str(html_output),
+            title=f"Vault NAV {vault_address}",
+            periods_per_year=periods_per_year,
+            match_dates=False,
         )
+
+        summary_row = {
+            "vault_address": vault_address,
+            "nav_start": float(nav_series.iloc[0]),
+            "nav_end": float(nav_series.iloc[-1]),
+            "balance": balance,
+            "annualized_return": annualized_return,
+            "sharpe": sharpe,
+            "mdd": mdd,
+            "win_rate": win_rate,
+            "time_in_market": time_in_market,
+            "avg_hold_days": avg_hold_days,
+            "trader_age_hours": trader_age_hours,
+            "freq": freq,
+            "metrics_mode": metrics_mode,
+        }
+        upsert_summary_row(summary_path, summary_row)
 
         print(
             f"[info] {vault_address} sharpe={sharpe:.3f} mdd={mdd:.2%} "
             f"nav_csv={nav_output} returns_csv={returns_output} html={html_output}"
         )
 
-        if vault_address.lower() == "0xb1505ad1a4c7755e0eb236aa2f4327bfc3474768":
-            validate_b150(nav_series, freq)
-
-    summary_path = root_dir / "vault_quantstat.csv"
-    if summary_rows:
-        pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
-        print(f"[info] summary saved to {summary_path}")
+    print(f"[info] summary saved to {summary_path}")
 
 
 if __name__ == "__main__":

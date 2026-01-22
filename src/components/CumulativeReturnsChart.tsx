@@ -7,18 +7,28 @@ interface CumulativeReturnsChartProps {
   height?: number;
   colorMode: ColorMode;
   lang: Language;
+  showBtcComparison?: boolean;
 }
 
-export function CumulativeReturnsChart({ data, height = 150, colorMode, lang }: CumulativeReturnsChartProps) {
+export function CumulativeReturnsChart({
+  data,
+  height = 150,
+  colorMode,
+  lang,
+  showBtcComparison = false,
+}: CumulativeReturnsChartProps) {
   // Calculate cumulative returns as percentage change from initial value
   const initialValue = data[0]?.pnl || 1000;
+  const initialBtc = data[0]?.btcPnl || initialValue;
   
   const formattedData = data.map(d => {
     const returnPct = ((d.pnl - initialValue) / initialValue) * 100;
+    const btcReturn = ((d.btcPnl ?? initialBtc) - initialBtc) / initialBtc * 100;
     return {
       timestamp: d.timestamp,
       date: new Date(d.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       return: returnPct,
+      btcReturn,
       positiveReturn: returnPct >= 0 ? returnPct : 0,
       negativeReturn: returnPct < 0 ? returnPct : 0,
       pnl: d.pnl
@@ -62,9 +72,11 @@ export function CumulativeReturnsChart({ data, height = 150, colorMode, lang }: 
         <Tooltip
           content={({ label, payload }) => {
             const returnItem = payload?.find((item) => item.dataKey === 'return');
+            const btcItem = payload?.find((item) => item.dataKey === 'btcReturn');
             if (!returnItem || typeof returnItem.value !== 'number') return null;
             const dateLabel = lang === 'en' ? 'Date' : '日期';
             const returnLabel = lang === 'en' ? 'Return' : '回报';
+            const btcLabel = lang === 'en' ? 'BTC Buy&Hold' : 'BTC 持有';
             return (
               <div
                 className="text-sm text-white"
@@ -77,6 +89,9 @@ export function CumulativeReturnsChart({ data, height = 150, colorMode, lang }: 
               >
                 <div className="mb-1">{dateLabel}: {label}</div>
                 <div>{returnLabel}: {returnItem.value.toFixed(2)}%</div>
+                {showBtcComparison && typeof btcItem?.value === 'number' && (
+                  <div>{btcLabel}: {btcItem.value.toFixed(2)}%</div>
+                )}
               </div>
             );
           }}
@@ -116,6 +131,18 @@ export function CumulativeReturnsChart({ data, height = 150, colorMode, lang }: 
           fill="transparent"
           isAnimationActive={true}
         />
+
+        {showBtcComparison && (
+          <Area
+            type="monotone"
+            dataKey="btcReturn"
+            stroke="rgba(255, 255, 255, 0.7)"
+            strokeWidth={1}
+            fill="transparent"
+            strokeDasharray="4 3"
+            isAnimationActive={false}
+          />
+        )}
       </AreaChart>
     </ResponsiveContainer>
   );

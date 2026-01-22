@@ -20,6 +20,9 @@ export interface Trade {
   exit: number;
   pnl: number;
   size: number;
+  symbol?: string;
+  leverage?: number;
+  price?: number;
 }
 
 export interface Trader {

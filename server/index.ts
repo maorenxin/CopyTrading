@@ -1,1 +1,6 @@
-// 服务端入口占位（后续接入 API 路由与 Telegram 机器人）
+import { startVaultTradesStream } from "./jobs/vault-trades-ws";
+import { log } from "./services/logger";
+
+startVaultTradesStream().catch((error) => {
+  log("error", "vault websocket start failed", { message: (error as Error).message });
+});
