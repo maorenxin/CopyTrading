@@ -11,9 +11,9 @@
 
 **Alternatives considered**: 仅依赖页面爬取（数据易变且维护成本高）。
 
-## Decision 2: 本地 Supabase 与线上结构保持同构
+## Decision 2: 本地 PostgreSQL 与线上结构保持同构
 
-**Decision**: 在本地创建与线上 Supabase 相同的表结构，新增 Vault 相关表以
+**Decision**: 在本地创建与线上一致的 PostgreSQL 表结构，新增 Vault 相关表以
 承载同步数据。
 
 **Rationale**: 同构结构可减少未来迁移成本，并保证服务端查询逻辑一致。

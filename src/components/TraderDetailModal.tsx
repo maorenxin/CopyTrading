@@ -12,11 +12,22 @@ import { MetricTabs } from './MetricTabs';
 import { RiskNotice } from './RiskNotice';
 import { fetchTraderTrades } from '../services/trades';
 import { fetchEquitySeries } from '../services/equity';
+import { fetchVaultPositions } from '../services/vaults';
 import { t } from '../utils/translations';
 import { getValueColor } from '../utils/colorMode';
-import { formatWalletAddress } from '../utils/formatWalletAddress';
 import { formatTraderAge } from '../utils/formatTraderAge';
+import { formatSignedPercent } from '../utils/formatPercent';
 import { Users, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const toTimestamp = (value: unknown) => {
+  const time = new Date(value as any).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
 
 interface TraderDetailModalProps {
   trader: Trader | null;
@@ -27,31 +38,88 @@ interface TraderDetailModalProps {
   colorMode: ColorMode;
 }
 
-export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, colorMode }: TraderDetailModalProps) {
-  if (!trader) return null;
+interface PositionRow {
+  id: string;
+  symbol: string;
+  type: 'long' | 'short';
+  quantity: number;
+  positionValue: number;
+  entryPrice: number;
+  markPrice: number;
+  pnl: number;
+  roe: number;
+}
 
+/**
+ * 标准化持仓数据为 UI 行结构。
+ * @param vaultAddress - Vault 地址。
+ * @param raw - 原始持仓数组。
+ * @returns 标准化后的持仓行。
+ */
+const normalizePositionRows = (vaultAddress: string, raw: any[]): PositionRow[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item, index) => {
+    const sideRaw = String(item?.side ?? item?.dir ?? item?.type ?? '').toLowerCase();
+    const type: 'long' | 'short' =
+      sideRaw.includes('short') || sideRaw === 's' || sideRaw === 'sell' ? 'short' : 'long';
+    const quantity = toNumber(item?.quantity ?? item?.sz ?? item?.size, 0);
+    const entryPrice = toNumber(item?.entry_price ?? item?.entryPrice ?? item?.entry, 0);
+    const markPrice = toNumber(item?.mark_price ?? item?.markPrice ?? item?.mark, entryPrice);
+    const positionValue = toNumber(
+      item?.position_value ?? item?.positionValue,
+      markPrice * quantity,
+    );
+    const direction = type === 'short' ? -1 : 1;
+    const pnl = (markPrice - entryPrice) * quantity * direction;
+    const roeFallback = positionValue > 0 ? (pnl / positionValue) * 100 : 0;
+    const roe = toNumber(item?.roe_percent ?? item?.roePercent, roeFallback);
+    return {
+      id: item?.id ?? item?.position_id ?? `${vaultAddress}-${index}`,
+      symbol: item?.symbol ?? item?.coin ?? item?.asset ?? 'BTC',
+      type,
+      quantity,
+      positionValue,
+      entryPrice,
+      markPrice,
+      pnl,
+      roe,
+    };
+  });
+};
+
+export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, colorMode }: TraderDetailModalProps) {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('ALL');
-  const [detailTrades, setDetailTrades] = useState<Trade[]>(trader.trades);
-  const [equitySeries, setEquitySeries] = useState(trader.pnlData);
+  const [detailTrades, setDetailTrades] = useState<Trade[]>(trader?.trades ?? []);
+  const [equitySeries, setEquitySeries] = useState(trader?.pnlData ?? []);
+  const [detailPositions, setDetailPositions] = useState<PositionRow[]>([]);
   const [showCopied, setShowCopied] = useState(false);
   const [tradePage, setTradePage] = useState(1);
   const [positionPage, setPositionPage] = useState(1);
 
   useEffect(() => {
+    if (!trader) {
+      setDetailTrades([]);
+      setEquitySeries([]);
+      setDetailPositions([]);
+      return;
+    }
     setDetailTrades(trader.trades);
     setEquitySeries(trader.pnlData);
+    setDetailPositions([]);
     setTradePage(1);
     setPositionPage(1);
   }, [trader]);
 
   useEffect(() => {
+    if (!trader) return;
     let isActive = true;
 
     const loadDetails = async () => {
       try {
-        const [trades, equity] = await Promise.all([
+        const [trades, equity, positions] = await Promise.all([
           fetchTraderTrades(trader.id),
           fetchEquitySeries(trader.id, timePeriod),
+          fetchVaultPositions(trader.id),
         ]);
 
         if (!isActive) return;
@@ -59,15 +127,14 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
           setDetailTrades(
             trades.items.map((item: any, index: number) => ({
               id: item.id ?? item.tx_hash ?? `trade-${index}`,
-              timestamp: new Date(item.timestamp).getTime(),
+              timestamp: toTimestamp(item.timestamp),
               type: item.side ?? item.type ?? 'long',
-              entry: item.entry ?? item.entry_price ?? item.price ?? 0,
-              exit: item.exit ?? item.exit_price ?? item.price ?? 0,
-              pnl: item.pnl ?? 0,
-              size: item.size ?? item.quantity ?? 0,
-              symbol: item.symbol ?? item.asset ?? 'BTC',
-              leverage: item.leverage ?? 5,
-              price: item.price ?? item.entry ?? item.entry_price ?? 0,
+              entry: toNumber(item.entry ?? item.entry_price ?? item.price, 0),
+              exit: toNumber(item.exit ?? item.exit_price ?? item.price, 0),
+              pnl: toNumber(item.pnl, 0),
+              size: toNumber(item.size ?? item.quantity, 0),
+              symbol: item.symbol ?? item.coin ?? item.asset ?? 'BTC',
+              price: toNumber(item.price ?? item.entry ?? item.entry_price, 0),
             }))
           );
         }
@@ -75,16 +142,21 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
         if (Array.isArray(equity?.points)) {
           setEquitySeries(
             equity.points.map((point: any) => ({
-              timestamp: new Date(point.timestamp).getTime(),
-              pnl: point.vault_equity ?? point.vaultEquity ?? 0,
-              btcPnl: point.btc_equity ?? point.btcEquity ?? 0,
+              timestamp: toTimestamp(point.timestamp),
+              pnl: toNumber(point.vault_equity ?? point.vaultEquity, 0),
+              btcPnl: toNumber(point.btc_equity ?? point.btcEquity, 0),
             }))
           );
         }
+
+        if (Array.isArray(positions)) {
+          setDetailPositions(normalizePositionRows(trader.id, positions));
+        }
       } catch {
-        if (!isActive) return;
+        if (!isActive || !trader) return;
         setDetailTrades(trader.trades);
         setEquitySeries(trader.pnlData);
+        setDetailPositions([]);
       }
     };
 
@@ -95,7 +167,12 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
     };
   }, [trader, timePeriod]);
 
+  /**
+   * 复制交易者地址到剪贴板。
+   * @returns void
+   */
   const handleCopyAddress = () => {
+    if (!trader) return;
     const textArea = document.createElement('textarea');
     textArea.value = trader.address;
     textArea.style.position = 'fixed';
@@ -118,30 +195,12 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
 
   const pageSize = 10;
   const tradePages = Math.max(1, Math.ceil(detailTrades.length / pageSize));
-  const positionRows = detailTrades.map((trade) => {
-    const price = trade.price ?? trade.entry ?? 0;
-    const quantity = trade.size ?? 0;
-    const notional = price * quantity;
-    const markPrice = trade.exit ?? price;
-    const leverage = trade.leverage ?? 5;
-    const pnl = trade.pnl ?? 0;
-    const roe = price ? (pnl / (price * quantity)) * 100 * leverage : 0;
-    return {
-      id: trade.id,
-      symbol: trade.symbol ?? 'BTC',
-      type: trade.type,
-      leverage,
-      quantity,
-      positionValue: notional,
-      entryPrice: price,
-      markPrice,
-      roe,
-      pnl,
-    };
-  });
+  const positionRows = detailPositions;
   const positionPages = Math.max(1, Math.ceil(positionRows.length / pageSize));
   const pagedTrades = detailTrades.slice((tradePage - 1) * pageSize, tradePage * pageSize);
   const pagedPositions = positionRows.slice((positionPage - 1) * pageSize, positionPage * pageSize);
+
+  if (!trader) return null;
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -185,7 +244,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                       onClick={handleCopyAddress}
                       className="text-white font-mono text-sm hover:text-white/80"
                     >
-                      {formatWalletAddress(trader.address)}
+                      {trader.address}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="bg-blue-500/90 border-blue-400/50 text-white backdrop-blur-sm">
@@ -203,7 +262,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                   )}
                   <span className="text-white/70 text-sm">{t('allTimeReturnLabel', lang)}:</span>
                   <span className={getValueColor(trader.allTimeReturn, colorMode)}>
-                    {trader.allTimeReturn > 0 ? '+' : ''}{trader.allTimeReturn.toFixed(1)}%
+                    {formatSignedPercent(trader.allTimeReturn, 1)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -269,7 +328,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
           <div className="p-4 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg">
             <Tabs
               defaultValue="trades"
-              onValueChange={(value) => {
+              onValueChange={(value: string) => {
                 if (value === 'trades') {
                   setTradePage(1);
                 }
@@ -279,10 +338,16 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
               }}
             >
               <TabsList className="bg-white/10 border border-white/20 mb-4">
-                <TabsTrigger value="trades" className="text-white/70">
+                <TabsTrigger
+                  value="trades"
+                  className="text-white/70 border border-transparent data-[state=active]:text-white data-[state=active]:bg-white/20 data-[state=active]:border-white/40 data-[state=active]:shadow-[0_0_18px_rgba(255,255,255,0.15)]"
+                >
                   {lang === 'en' ? 'Trades' : '交易记录'}
                 </TabsTrigger>
-                <TabsTrigger value="positions" className="text-white/70">
+                <TabsTrigger
+                  value="positions"
+                  className="text-white/70 border border-transparent data-[state=active]:text-white data-[state=active]:bg-white/20 data-[state=active]:border-white/40 data-[state=active]:shadow-[0_0_18px_rgba(255,255,255,0.15)]"
+                >
                   {lang === 'en' ? 'Latest Positions' : '最新仓位'}
                 </TabsTrigger>
               </TabsList>
@@ -295,7 +360,6 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                         <TableHead className="text-white/70">{t('date', lang)}</TableHead>
                         <TableHead className="text-white/70">{lang === 'en' ? 'Symbol' : '币种'}</TableHead>
                         <TableHead className="text-white/70">{t('type', lang)}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Leverage' : '杠杆'}</TableHead>
                         <TableHead className="text-white/70">{lang === 'en' ? 'Price' : '价格'}</TableHead>
                         <TableHead className="text-white/70">{lang === 'en' ? 'Quantity' : '数量'}</TableHead>
                         <TableHead className="text-white/70">{lang === 'en' ? 'Notional' : '成交价值'}</TableHead>
@@ -324,9 +388,6 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                               >
                                 {trade.type === 'long' ? t('long', lang) : t('short', lang)}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-white text-sm">
-                              {trade.leverage ?? 5}x
                             </TableCell>
                             <TableCell className="text-white text-sm">
                               ${price.toLocaleString()}
@@ -373,7 +434,6 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                       <TableRow className="border-white/20">
                         <TableHead className="text-white/70">{lang === 'en' ? 'Symbol' : '币种'}</TableHead>
                         <TableHead className="text-white/70">{t('type', lang)}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Leverage' : '杠杆'}</TableHead>
                         <TableHead className="text-white/70">{lang === 'en' ? 'Quantity' : '数量'}</TableHead>
                         <TableHead className="text-white/70">{lang === 'en' ? 'Position Value' : '仓位价值'}</TableHead>
                         <TableHead className="text-white/70">{lang === 'en' ? 'Entry Price' : '开仓价格'}</TableHead>
@@ -398,7 +458,6 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                                 {position.type === 'long' ? t('long', lang) : t('short', lang)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-white text-sm">{position.leverage}x</TableCell>
                             <TableCell className="text-white text-sm">{position.quantity.toLocaleString()}</TableCell>
                             <TableCell className="text-white text-sm">
                               ${position.positionValue.toLocaleString()}

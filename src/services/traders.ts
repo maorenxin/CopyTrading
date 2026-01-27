@@ -1,5 +1,4 @@
 import type { SortOption, Trader, ViewMode } from '../types/trader';
-import { mockTraders } from '../utils/mockData';
 
 export interface TraderListParams {
   view: ViewMode;
@@ -8,6 +7,11 @@ export interface TraderListParams {
   lang: 'en' | 'cn';
 }
 
+/**
+ * 拉取交易员列表。
+ * @param params - 查询参数。
+ * @returns 交易员列表（无数据时返回空数组）。
+ */
 export async function fetchTraders(params: TraderListParams): Promise<Trader[]> {
   const query = new URLSearchParams({
     view: params.view,
@@ -23,11 +27,11 @@ export async function fetchTraders(params: TraderListParams): Promise<Trader[]> 
     }
 
     const data = await response.json();
-    if (Array.isArray(data.items) && data.items.length > 0) {
+    if (Array.isArray(data.items)) {
       return data.items;
     }
-    return mockTraders;
+    return [];
   } catch {
-    return mockTraders;
+    return [];
   }
 }

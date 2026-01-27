@@ -3,12 +3,17 @@ import { log } from "./logger";
 import * as path from "path";
 import {
   appendCsvRows,
+  toChinaTimestamp,
+  toIso,
+  toNumber,
   findVaultEntryByAddress,
+  findVaultEntryByAddressFromDb,
   loadVaultAddressesFromCsv,
+  loadVaultAddressesFromDb,
   parseJsonMaybe,
-  readLatestTimeFromCsv,
   scrapeByWindow,
 } from "./hyperliquid-utils";
+import { getLatestVaultFundingUtcTime, upsertVaultFunding } from "./vault-repository";
 
 // === 类型 ===
 interface FundingDelta {
@@ -155,19 +160,21 @@ export async function scrapeUserFundingForVault(
   const csvPath = path.join(outputDir, `${normalizedAddress}.csv`);
   let baseStartTime = options.createTimeMillis;
   if (typeof baseStartTime !== "number" || !Number.isFinite(baseStartTime)) {
-    const entry = await findVaultEntryByAddress(normalizedAddress);
+    const entry =
+      (await findVaultEntryByAddressFromDb(normalizedAddress)) ??
+      (await findVaultEntryByAddress(normalizedAddress));
     baseStartTime = entry?.createTimeMillis;
   }
   if (typeof baseStartTime !== "number" || !Number.isFinite(baseStartTime)) {
     baseStartTime = Date.now() - 3 * 365 * 24 * 60 * 60 * 1000;
   }
 
-  const latestTime = await readLatestTimeFromCsv(csvPath, "time");
+  const latestDbTime = await getLatestVaultFundingUtcTime(normalizedAddress);
   const startTime =
     typeof options.startTime === "number"
       ? options.startTime
-      : typeof latestTime === "number" && latestTime >= baseStartTime
-        ? latestTime + 1
+      : typeof latestDbTime === "number" && latestDbTime >= baseStartTime
+        ? latestDbTime + 1
         : baseStartTime;
   const endTime = typeof options.endTime === "number" ? options.endTime : Number(Date.now());
   const windowMs =
@@ -178,12 +185,26 @@ export async function scrapeUserFundingForVault(
   log("info", "user funding scrape start", {
     vaultAddress: normalizedAddress,
     createTimeMillis: baseStartTime ?? null,
-    resumeFromTime: latestTime ?? null,
+    resumeFromTime: latestDbTime ?? null,
   });
 
   const output = await scrapeUserFundingHistory(normalizedAddress, { startTime, endTime, windowMs });
   const rows = buildCsvRows(output.funding, normalizedAddress);
   await appendCsvRows(csvPath, rows, { columns: FUNDING_COLUMNS });
+  const dbRows = rows.map((row) => ({
+    vaultAddress: normalizedAddress,
+    utcTime: toIso(row.time),
+    timestamp: toChinaTimestamp(row.time),
+    entryType: row.type ?? undefined,
+    coin: row.coin ?? undefined,
+    usdc: toNumber(row.usdc),
+    szi: toNumber(row.szi),
+    fundingRate: toNumber(row.fundingRate),
+    nSamples: toNumber(row.nSamples),
+  }));
+  if (dbRows.length > 0) {
+    await upsertVaultFunding(dbRows);
+  }
   log("info", "user funding written", { vaultAddress: normalizedAddress, csvPath, count: rows.length });
 }
 
@@ -197,7 +218,10 @@ async function run() {
   const limit = Number(process.env.VAULTS_FUNDING_LIMIT ?? -1);
   const relationshipType = process.env.VAULTS_RELATIONSHIP_TYPE ?? "normal";
   const outputDir = process.env.VAULT_FUNDING_OUTPUT_DIR || "vault_funding_data";
-  const targets = await loadVaultAddressesFromCsv(minTvl, limit, relationshipType);
+  const dbTargets = await loadVaultAddressesFromDb(minTvl, limit, relationshipType);
+  const targets = dbTargets.length
+    ? dbTargets
+    : await loadVaultAddressesFromCsv(minTvl, limit, relationshipType);
   if (targets.length === 0) {
     log("warn", "no vaults matched tvl filter", { minTvl, relationshipType });
     return;

@@ -27,4 +27,11 @@ tests/
 - 001-copytrade-platform: 已新增
 
 <!-- MANUAL ADDITIONS START -->
+## 交互语言
+- 开发过程与回答一律使用中文
+
+## 注释与文档规范
+- 对新增/修改的类或方法使用简短的 JSDoc，说明用途、入参、返回
+- 对复杂逻辑块添加必要注释，便于 review（保持简洁，避免无意义注释）
+- 非关键/自明逻辑不强制添加注释
 <!-- MANUAL ADDITIONS END -->

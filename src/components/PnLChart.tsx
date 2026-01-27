@@ -1,5 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { PnLDataPoint, ColorMode } from '../types/trader';
+import { PnLDataPoint, ColorMode, Language } from '../types/trader';
 import { getPositiveStrokeColor, getNegativeStrokeColor } from '../utils/colorMode';
 
 interface PnLChartProps {
@@ -7,12 +7,20 @@ interface PnLChartProps {
   height?: number;
   showBtcComparison?: boolean;
   colorMode: ColorMode;
+  lang?: Language;
 }
 
-export function PnLChart({ data, height = 150, showBtcComparison = false, colorMode }: PnLChartProps) {
+export function PnLChart({
+  data,
+  height = 150,
+  showBtcComparison = false,
+  colorMode,
+  lang = 'en',
+}: PnLChartProps) {
+  const locale = lang === 'en' ? 'en-US' : 'zh-CN';
   const formattedData = data.map(d => ({
     ...d,
-    date: new Date(d.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    date: new Date(d.timestamp).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
   }));
 
   // Determine the overall trend

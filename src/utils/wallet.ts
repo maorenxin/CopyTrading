@@ -48,6 +48,37 @@ export async function getAccounts(provider: WalletProvider): Promise<string[]> {
   return Array.isArray(result) ? (result as string[]) : [];
 }
 
+/**
+ * 请求钱包签名以触发用户确认。
+ * @param provider - 钱包 provider。
+ * @param account - 签名账户。
+ * @param message - 签名消息。
+ * @returns 签名字符串，失败时返回 null。
+ */
+export async function requestWalletSignature(
+  provider: WalletProvider,
+  account: string,
+  message: string,
+): Promise<string | null> {
+  try {
+    const signature = await provider.request({
+      method: 'personal_sign',
+      params: [message, account],
+    });
+    return typeof signature === 'string' ? signature : null;
+  } catch {
+    try {
+      const signature = await provider.request({
+        method: 'personal_sign',
+        params: [account, message],
+      });
+      return typeof signature === 'string' ? signature : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
 export function subscribeAccountsChanged(
   provider: WalletProvider,
   handler: (accounts: string[]) => void

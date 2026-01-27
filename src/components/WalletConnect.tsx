@@ -14,21 +14,20 @@ import type { WalletStatus, WalletProviderInfo } from '../types/wallet';
 
 interface WalletConnectProps {
   lang: Language;
-  web3Mock: boolean;
 }
 
-export function WalletConnect({ lang, web3Mock }: WalletConnectProps) {
+/**
+ * 钱包连接按钮与状态展示。
+ * @param props - 钱包组件参数。
+ * @returns WalletConnect 组件。
+ */
+export function WalletConnect({ lang }: WalletConnectProps) {
   const [status, setStatus] = useState<WalletStatus>('disconnected');
   const [address, setAddress] = useState('');
   const [error, setError] = useState('');
   const [providerInfo, setProviderInfo] = useState<WalletProviderInfo | null>(null);
 
   useEffect(() => {
-    if (web3Mock) {
-      setStatus('disconnected');
-      return;
-    }
-
     const info = getInjectedProvider();
     setProviderInfo(info);
     if (!info) {
@@ -73,17 +72,9 @@ export function WalletConnect({ lang, web3Mock }: WalletConnectProps) {
     });
 
     return () => cleanup();
-  }, [web3Mock]);
+  }, []);
 
   const connectWallet = async () => {
-    if (web3Mock) {
-      const mockAddress = `0x${Math.random().toString(16).slice(2, 42)}`;
-      setAddress(mockAddress);
-      setStatus('connected');
-      localStorage.setItem('wallet_address', mockAddress);
-      return;
-    }
-
     if (!providerInfo) {
       setStatus('unavailable');
       return;
@@ -131,7 +122,7 @@ export function WalletConnect({ lang, web3Mock }: WalletConnectProps) {
     );
   }
 
-  if (!web3Mock && status === 'unavailable') {
+  if (status === 'unavailable') {
     return (
       <div className="flex flex-col items-end gap-1">
         <Button

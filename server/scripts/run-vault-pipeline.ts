@@ -2,11 +2,24 @@ import { spawn } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
-import { loadVaultAddressesFromCsv } from "../services/hyperliquid-utils";
+import {
+  loadVaultAddressesFromCsv,
+  loadVaultAddressesFromDb,
+  findVaultEntryByAddressFromDb,
+  toNumber,
+} from "../services/hyperliquid-utils";
+import { HyperliquidClient } from "../services/hyperliquid-client";
 import { downloadCryptoPrices } from "../services/crypto-price-downloader";
 import { scrapeVaultTradesForAddress } from "../services/hyperliquid-scrapeVaultInfoAndTrade";
 import { scrapeUserNonFundingLedgerForVault } from "../services/hyperliquid-scrapeUserNonFundingLedger";
 import { scrapeUserFundingForVault } from "../services/hyperliquid-scrapeUserFunding";
+import {
+  createVaultSyncRun,
+  finalizeVaultSyncRun,
+  upsertVaultAddresses,
+} from "../services/vault-db-writer";
+import { loadVaultQuantstatsToDb } from "../services/vault-quantstat-loader";
+import { replaceVaultPositions, VaultPositionInput } from "../services/vault-repository";
 
 // === 参数读取 ===
 /**
@@ -18,6 +31,28 @@ import { scrapeUserFundingForVault } from "../services/hyperliquid-scrapeUserFun
 function parseNumber(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/**
+ * 归一化持仓数据为 vault_positions 结构。
+ * @param vaultAddress - Vault 地址。
+ * @param raw - 原始持仓响应。
+ * @returns 归一化后的持仓数组。
+ */
+function normalizePositions(vaultAddress: string, raw: any): VaultPositionInput[] {
+  const items = raw?.positions ?? raw?.items ?? raw ?? [];
+  if (!Array.isArray(items)) return [];
+  return items.map((item: any) => ({
+    vaultAddress,
+    symbol: item?.symbol ?? item?.coin ?? item?.asset,
+    side: item?.side ?? item?.dir ?? item?.type,
+    leverage: toNumber(item?.leverage ?? item?.lev),
+    quantity: toNumber(item?.quantity ?? item?.sz ?? item?.size),
+    entryPrice: toNumber(item?.entryPrice ?? item?.entry_px ?? item?.entry),
+    markPrice: toNumber(item?.markPrice ?? item?.mark_px ?? item?.mark),
+    positionValue: toNumber(item?.positionValue ?? item?.position_value),
+    roePercent: toNumber(item?.roePercent ?? item?.roe),
+  }));
 }
 
 /**
@@ -204,20 +239,75 @@ function runQuantstats(vaultAddress: string): Promise<void> {
  * @returns 执行完成的异步结果。
  */
 async function run(): Promise<void> {
+  // 检查命令行参数来确定要处理的vault地址
+  const args = process.argv.slice(2);
+  const vaultArg = args.length > 0 ? args[0]?.toLowerCase() : null;
+
   const minTvl = parseNumber(process.env.VAULTS_TVL_MIN, 5000);
   const limit = parseNumber(process.env.VAULTS_LIMIT, -1);
+  const randomLimit = parseNumber(process.env.VAULTS_RANDOM_LIMIT, 0);
   const relationshipType = process.env.VAULTS_RELATIONSHIP_TYPE ?? "normal";
   const sleepMs = parseNumber(process.env.PIPELINE_SLEEP_MS, 0);
 
-  const targets = await loadVaultAddressesFromCsv(minTvl, limit, relationshipType);
+  let targets: Array<{ vaultAddress: string; createTimeMillis?: number }> = [];
+
+  // 优先使用命令行参数指定的vault地址
+  if (vaultArg) {
+    const entry = await findVaultEntryByAddressFromDb(vaultArg);
+    targets = [{
+      vaultAddress: vaultArg,
+      createTimeMillis: entry?.createTimeMillis,
+    }];
+  } else {
+    const targetEnv = process.env.VAULTS_TARGETS ?? "";
+    const targetList = targetEnv
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (targetList.length > 0) {
+      const resolved = await Promise.all(
+        targetList.map(async (vaultAddress) => {
+          const entry = await findVaultEntryByAddressFromDb(vaultAddress);
+          return {
+            vaultAddress,
+            createTimeMillis: entry?.createTimeMillis,
+          };
+        }),
+      );
+      targets = resolved;
+    } else {
+      const useRandom = randomLimit > 0;
+      const dbTargets = await loadVaultAddressesFromDb(
+        minTvl,
+        useRandom ? randomLimit : limit,
+        relationshipType,
+        useRandom,
+      );
+      targets = dbTargets.length
+        ? dbTargets
+        : await loadVaultAddressesFromCsv(minTvl, limit, relationshipType);
+    }
+  }
   if (targets.length === 0) {
     console.warn("[warn] no vaults matched filters");
     return;
   }
 
+  const syncRun = await createVaultSyncRun("pipeline", targets.length);
+  await upsertVaultAddresses(
+    targets.map((target) => target.vaultAddress),
+    syncRun.id
+  );
+
+  const client = new HyperliquidClient();
+  const failedVaults: string[] = [];
+  let successCount = 0;
+
   for (const target of targets) {
     const vaultAddress = target.vaultAddress.toLowerCase();
     console.log(`[info] pipeline start ${vaultAddress}`);
+    let vaultOk = true;
 
     try {
       await scrapeVaultTradesForAddress(vaultAddress, {
@@ -244,6 +334,17 @@ async function run(): Promise<void> {
     }
 
     try {
+      const positionData = await client.fetchVaultPositions(vaultAddress);
+      const positions = normalizePositions(vaultAddress, positionData).map((position) => ({
+        ...position,
+        syncRunId: syncRun.id,
+      }));
+      await replaceVaultPositions(vaultAddress, positions, syncRun.id);
+    } catch (error) {
+      console.warn(`[warn] positions fetch failed ${vaultAddress}: ${(error as Error).message}`);
+    }
+
+    try {
       await downloadPricesForVault(vaultAddress);
     } catch (error) {
       console.warn(`[warn] price download failed ${vaultAddress}: ${(error as Error).message}`);
@@ -259,14 +360,43 @@ async function run(): Promise<void> {
       await runQuantstats(vaultAddress);
     } catch (error) {
       console.warn(`[warn] quantstats failed ${vaultAddress}: ${(error as Error).message}`);
+      vaultOk = false;
+    }
+
+    if (vaultOk) {
+      try {
+        await loadVaultQuantstatsToDb({
+          vaultAddresses: [vaultAddress],
+          syncRunId: syncRun.id,
+        });
+        successCount += 1;
+      } catch (error) {
+        console.warn(
+          `[warn] quantstat db load failed ${vaultAddress}: ${(error as Error).message}`
+        );
+        vaultOk = false;
+      }
     }
 
     if (sleepMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, sleepMs));
     }
 
+    if (!vaultOk) {
+      failedVaults.push(vaultAddress);
+    }
+
     console.log(`[info] pipeline done ${vaultAddress}`);
   }
+
+  const status =
+    failedVaults.length === 0 ? "success" : successCount > 0 ? "partial" : "failed";
+  await finalizeVaultSyncRun(syncRun.id, {
+    status,
+    successCount,
+    failedVaults,
+    note: `vaults:${targets.length}, success:${successCount}, failed:${failedVaults.length}`,
+  });
 }
 
 if (require.main === module) {

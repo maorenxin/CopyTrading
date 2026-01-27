@@ -1,6 +1,8 @@
 import { TraderMetrics, Trader } from "../types/trader";
 import { Language } from "../types/trader";
 import { formatBalance } from "../utils/formatBalance";
+import { formatTraderAge } from "../utils/formatTraderAge";
+import { formatPercent, formatPercentAbs } from "../utils/formatPercent";
 
 interface RadarChartProps {
   metrics: TraderMetrics;
@@ -10,6 +12,11 @@ interface RadarChartProps {
   showValuesOnAxis?: boolean;
 }
 
+/**
+ * 雷达图组件，展示交易员多维指标与实际数值。
+ * @param props - 组件入参。
+ * @returns 雷达图 UI。
+ */
 export function RadarChart({
   metrics,
   trader,
@@ -25,13 +32,13 @@ export function RadarChart({
 
   // Calculate actual values for display
   const getTraderAge = () =>
-    trader ? `${trader.traderAgeDays}mo` : "";
+    trader ? formatTraderAge(trader.traderAgeDays, lang) : "";
   const getAnnualReturn = () =>
-    trader ? `${trader.allTimeReturn.toFixed(1)}%` : "";
+    trader ? formatPercent(trader.annualizedReturn, 1) : "";
   const getSharpe = () =>
-    trader ? `${(metrics.sharpe * 0.5).toFixed(2)}` : "";
+    trader ? `${trader.sharpeRatio.toFixed(2)}` : "";
   const getMaxDrawdown = () =>
-    trader ? `${trader.maxDrawdownPercent.toFixed(1)}%` : "";
+    trader ? formatPercentAbs(trader.maxDrawdownPercent, 1) : "";
   const getBalance = () =>
     trader ? formatBalance(trader.balance) : "";
 
@@ -47,12 +54,12 @@ export function RadarChart({
       displayValue: getAnnualReturn(),
     },
     {
-      name: "Sharpe",
+      name: lang === "en" ? "Sharpe" : "夏普比率",
       value: metrics.sharpe,
       displayValue: getSharpe(),
     },
     {
-      name: "MDD",
+      name: lang === "en" ? "MDD" : "最大回撤",
       value: metrics.maxDrawdown,
       displayValue: getMaxDrawdown(),
     },

@@ -9,6 +9,7 @@ import { t } from '../utils/translations';
 import { getValueColor } from '../utils/colorMode';
 import { useState } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
+import { formatPercentAbs, formatSignedPercent } from '../utils/formatPercent';
 
 interface TraderCardProps {
   trader: Trader;
@@ -28,8 +29,12 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
-  // Copy address to clipboard
-  const handleCopyAddress = () => {
+  /**
+   * 复制交易者地址，阻止触发卡片跳转。
+   * @param event - 点击事件。
+   */
+  const handleCopyAddress = (event: React.MouseEvent<HTMLSpanElement>) => {
+    event.stopPropagation();
     // Fallback method for clipboard copy (works without HTTPS)
     const textArea = document.createElement('textarea');
     textArea.value = trader.address;
@@ -55,8 +60,17 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
 
   return (
     <Card
-      className="p-5 bg-white/10 backdrop-blur-md border-white/20 transition-all duration-300 hover:shadow-lg hover:shadow-white/10"
+      className="p-5 bg-white/10 backdrop-blur-md border-white/20 transition-all duration-300 hover:shadow-lg hover:shadow-white/10 cursor-pointer"
       style={{ backdropFilter: 'blur(10px)' }}
+      role="button"
+      tabIndex={0}
+      onClick={() => onViewDetails(trader)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onViewDetails(trader);
+        }
+      }}
     >
       {/* Trader Address - Single Row */}
       <div className="mb-4 flex items-center justify-between">
@@ -148,7 +162,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
             <Target className="w-3 h-3 text-green-400" />
             <p className="text-white/70 text-xs">{t('winRateLabel', lang)}</p>
           </div>
-          <p className="text-white text-lg">{trader.winRatePercent.toFixed(1)}%</p>
+          <p className="text-white text-lg">{formatPercentAbs(trader.winRatePercent, 1)}</p>
         </div>
 
         {/* All-Time Return */}
@@ -162,7 +176,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
             <p className="text-white/70 text-xs">{t('allTimeReturnLabel', lang)}</p>
           </div>
           <p className={`text-lg ${getValueColor(trader.allTimeReturn, colorMode)}`}>
-            {isPositive ? '+' : ''}{trader.allTimeReturn.toFixed(1)}%
+            {formatSignedPercent(trader.allTimeReturn, 1)}
           </p>
         </div>
 
@@ -173,7 +187,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
             <p className="text-white/70 text-xs">{t('timeInMarketLabel', lang)}</p>
           </div>
           <p className="text-white text-lg">
-            {trader.timeInMarketPercent.toFixed(0)}%
+            {formatPercentAbs(trader.timeInMarketPercent, 0)}
           </p>
         </div>
 

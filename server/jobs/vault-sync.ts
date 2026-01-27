@@ -12,6 +12,7 @@ import {
 } from "../services/vault-repository";
 import { createSyncRun, completeSyncRun } from "../services/sync-run-service";
 import { log } from "../services/logger";
+import { computeEndPosition } from "../services/hyperliquid-utils";
 
 const CONCURRENCY = Number(process.env.VAULT_SYNC_CONCURRENCY ?? 5);
 
@@ -27,6 +28,25 @@ const toIso = (value: unknown): string | undefined => {
   }
   const date = new Date(value as string);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
+const chinaFormatter = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+const toChinaTimestamp = (value: unknown): string | undefined => {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (Number.isFinite(parsed)) return chinaFormatter.format(new Date(parsed));
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? undefined : chinaFormatter.format(date);
 };
 
 const pickVaultAddress = (item: any): string | undefined => {
@@ -52,7 +72,7 @@ const normalizeVault = (item: any): VaultUpsertInput | null => {
     summary?.status ??
     (typeof isClosed === "boolean" ? (isClosed ? "closed" : "active") : undefined);
   return {
-    vaultAddress,
+    vaultAddress: vaultAddress.toLowerCase(),
     name: summary?.name ?? item?.name ?? item?.vaultName ?? item?.vault?.name,
     managerAddress: leader,
     creatorAddress: leader,
@@ -73,26 +93,41 @@ const normalizeVault = (item: any): VaultUpsertInput | null => {
   };
 };
 
-const normalizeTrades = (vaultId: string, raw: any): VaultTradeInput[] => {
+const normalizeTrades = (vaultAddress: string, raw: any): VaultTradeInput[] => {
   const items = raw?.trades ?? raw?.items ?? raw?.history ?? raw ?? [];
   if (!Array.isArray(items)) return [];
-  return items.map((item: any, index: number) => ({
-    vaultId,
-    txHash: item?.tx_hash ?? item?.hash ?? item?.id ?? `${vaultId}-${index}-${item?.time ?? Date.now()}`,
-    side: item?.side ?? item?.dir ?? item?.type,
-    price: toNumber(item?.price ?? item?.px),
-    size: toNumber(item?.size ?? item?.sz ?? item?.qty),
-    pnl: toNumber(item?.pnl ?? item?.closedPnl),
-    timestamp: toIso(item?.timestamp ?? item?.time ?? item?.t),
-    source: "sync",
-  }));
+  return items.map((item: any, index: number) => {
+    const size = toNumber(item?.size ?? item?.sz ?? item?.qty);
+    const dir = item?.dir ?? item?.side ?? item?.type;
+    const startPosition = toNumber(item?.start_position ?? item?.startPosition);
+    const endPosition = computeEndPosition(startPosition, size, dir);
+    return {
+      vaultAddress,
+      txHash:
+        item?.tid ??
+        item?.tx_hash ??
+        item?.hash ??
+        item?.id ??
+        `${vaultAddress}-${index}-${item?.time ?? Date.now()}`,
+      coin: item?.coin ?? item?.symbol ?? item?.asset,
+      side: item?.side ?? item?.dir ?? item?.type,
+      price: toNumber(item?.price ?? item?.px),
+      size,
+      startPosition,
+      endPosition,
+      pnl: toNumber(item?.pnl ?? item?.closedPnl),
+      utcTime: toIso(item?.timestamp ?? item?.time ?? item?.t),
+      timestamp: toChinaTimestamp(item?.timestamp ?? item?.time ?? item?.t),
+      source: "sync",
+    };
+  });
 };
 
-const normalizePositions = (vaultId: string, raw: any): VaultPositionInput[] => {
+const normalizePositions = (vaultAddress: string, raw: any): VaultPositionInput[] => {
   const items = raw?.positions ?? raw?.items ?? raw ?? [];
   if (!Array.isArray(items)) return [];
   return items.map((item: any) => ({
-    vaultId,
+    vaultAddress,
     symbol: item?.symbol ?? item?.coin ?? item?.asset,
     side: item?.side ?? item?.dir ?? item?.type,
     leverage: toNumber(item?.leverage ?? item?.lev),
@@ -104,11 +139,11 @@ const normalizePositions = (vaultId: string, raw: any): VaultPositionInput[] => 
   }));
 };
 
-const normalizeDepositors = (vaultId: string, raw: any): VaultDepositorInput[] => {
+const normalizeDepositors = (vaultAddress: string, raw: any): VaultDepositorInput[] => {
   const items = raw?.depositors ?? raw?.items ?? raw ?? [];
   if (!Array.isArray(items)) return [];
   return items.map((item: any) => ({
-    vaultId,
+    vaultAddress,
     depositorAddress: item?.address ?? item?.depositor ?? item?.wallet,
     amountUsdc: toNumber(item?.amountUsdc ?? item?.amount ?? item?.usd),
     sharePercent: toNumber(item?.sharePercent ?? item?.share ?? item?.percent),
@@ -119,7 +154,7 @@ export async function runVaultSync(): Promise<{ syncRunId: string; status: strin
   const client = new HyperliquidClient();
   let vaultSource = "official";
   let rawVaults: any = await client.fetchVaults();
-  let vaultList = Array.isArray(rawVaults) ? rawVaults : rawVaults?.vaults ?? [];
+  let vaultList: any[] = Array.isArray(rawVaults) ? rawVaults : rawVaults?.vaults ?? [];
 
   if (vaultList.length === 0) {
     vaultSource = "fallback";
@@ -127,12 +162,16 @@ export async function runVaultSync(): Promise<{ syncRunId: string; status: strin
     rawVaults = scraped.vaults;
     vaultList = Array.isArray(rawVaults) ? rawVaults : rawVaults?.vaults ?? [];
   }
-  const normalizedVaults = vaultList
+  const normalizedVaults: VaultUpsertInput[] = vaultList
     .map(normalizeVault)
     .filter((vault): vault is VaultUpsertInput => Boolean(vault));
 
   const syncRun = await createSyncRun(vaultSource, normalizedVaults.length);
-  const vaultIdMap = await upsertVaults(normalizedVaults);
+  const vaultsWithSync = normalizedVaults.map((vault) => ({
+    ...vault,
+    lastSyncRunId: syncRun.id,
+  }));
+  await upsertVaults(vaultsWithSync);
 
   const queue = normalizedVaults.slice();
   const failedVaults: string[] = [];
@@ -142,8 +181,6 @@ export async function runVaultSync(): Promise<{ syncRunId: string; status: strin
     while (queue.length > 0) {
       const vault = queue.shift();
       if (!vault) continue;
-      const vaultId = vaultIdMap.get(vault.vaultAddress)?.id;
-      if (!vaultId) continue;
 
       try {
         const [tradeData, positionData, depositorData] = await Promise.all([
@@ -152,13 +189,22 @@ export async function runVaultSync(): Promise<{ syncRunId: string; status: strin
           client.fetchVaultDepositors(vault.vaultAddress),
         ]);
 
-        const trades = normalizeTrades(vaultId, tradeData);
-        const positions = normalizePositions(vaultId, positionData);
-        const depositors = normalizeDepositors(vaultId, depositorData);
+        const trades = normalizeTrades(vault.vaultAddress, tradeData).map((trade) => ({
+          ...trade,
+          syncRunId: syncRun.id,
+        }));
+        const positions = normalizePositions(vault.vaultAddress, positionData).map((position) => ({
+          ...position,
+          syncRunId: syncRun.id,
+        }));
+        const depositors = normalizeDepositors(vault.vaultAddress, depositorData).map((depositor) => ({
+          ...depositor,
+          syncRunId: syncRun.id,
+        }));
 
         await upsertVaultTrades(trades);
-        await replaceVaultPositions(vaultId, positions);
-        await replaceVaultDepositors(vaultId, depositors);
+        await replaceVaultPositions(vault.vaultAddress, positions);
+        await replaceVaultDepositors(vault.vaultAddress, depositors);
 
         successCount += 1;
       } catch (error) {

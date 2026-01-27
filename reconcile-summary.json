@@ -1,0 +1,16 @@
+{
+  "id": "04078890-9fd8-419e-a274-ce7edd0cab65",
+  "sync_run_id": "522261f2-d3d4-4a66-8835-cf68fdf61750",
+  "csv_vaults_count": 8949,
+  "db_vaults_count": 20,
+  "csv_trades_count": 1907291,
+  "db_trades_count": 0,
+  "csv_positions_count": null,
+  "db_positions_count": 0,
+  "csv_depositors_count": null,
+  "db_depositors_count": 0,
+  "diff_vaults_count": 8929,
+  "diff_trades_count": 1907291,
+  "diff_positions_count": null,
+  "diff_depositors_count": null
+}

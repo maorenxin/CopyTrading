@@ -15,6 +15,7 @@ export const translations = {
         sortBy: 'Sort by',
 
         // Sort options
+        compositeRank: 'Overall Rank',
         arr: 'Annual Return Ratio(ARR)',
         sharpe: 'Sharpe Ratio',
         maxDrawdown: 'Max Drawdown(MDD)',
@@ -131,6 +132,7 @@ export const translations = {
         sortBy: '排序方式',
 
         // Sort options
+        compositeRank: '综合排名',
         arr: '年化收益(ARR)',
         sharpe: '夏普比率',
         maxDrawdown: '最大回撤(MDD)',

@@ -2,6 +2,9 @@
       "name": "CopyTrading",
       "version": "0.1.0",
       "private": true,
+      "engines": {
+            "node": ">=20.0.0"
+      },
       "dependencies": {
             "@radix-ui/react-accordion": "^1.2.3",
             "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -50,7 +53,9 @@
             "vaul": "^1.1.2"
       },
       "devDependencies": {
+            "@types/lodash": "^4.17.21",
             "@types/node": "^20.10.0",
+            "@types/pg": "^8.11.10",
             "@types/papaparse": "^5.5.2",
             "@types/react": "^19.2.7",
             "@types/react-dom": "^19.2.3",
@@ -60,10 +65,10 @@
             "vite": "6.3.5"
       },
       "scripts": {
-            "dev": "vite",
-            "build": "vite build",
-            "vault:sync:local": "node server/scripts/local-vault-sync.js",
-            "vault:scrape:local": "node server/scripts/local-vaults-scrape.js",
-            "vault:trades:local": "node server/scripts/local-vault-trades.js"
-      }
+    "dev": "vite",
+    "build": "vite build",
+    "api:dev": "ts-node --transpile-only server/api/server.ts",
+    "vault:scrape:local": "node server/scripts/local-vaults-scrape.js",
+    "vault:trades:local": "node server/scripts/local-vault-trades.js"
+  }
 }

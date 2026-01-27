@@ -2,8 +2,9 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import * as Papa from "papaparse";
 import { fetch as undiciFetch, ProxyAgent } from "undici";
+import { query } from "../db/postgres";
 import { log } from "./logger";
-import { appendCsvRows, readLatestTimeFromCsv, sleep } from "./hyperliquid-utils";
+import { appendCsvRows, sleep } from "./hyperliquid-utils";
 
 // === 类型 ===
 interface KlineRow extends Record<string, unknown> {
@@ -58,6 +59,149 @@ const COIN_SYMBOL_OVERRIDES: Record<string, string> = {
   KPEPE: "kPEPE",
   KBONK: "kBONK",
 };
+const CRYPTO_DB_BATCH_SIZE = Number(process.env.CRYPTO_DB_BATCH_SIZE ?? 1000);
+
+let cryptoSyncTableReady = false;
+let cryptoPriceTableReady = false;
+
+async function ensureCryptoSyncTable() {
+  if (cryptoSyncTableReady) return;
+  await query(
+    `create table if not exists crypto_sync_state (
+      source text not null,
+      symbol text not null,
+      interval text not null,
+      last_time bigint,
+      updated_at timestamptz default now(),
+      primary key (source, symbol, interval)
+    )`,
+  );
+  cryptoSyncTableReady = true;
+}
+
+async function ensureCryptoPriceTable() {
+  if (cryptoPriceTableReady) return;
+  await query(
+    `create table if not exists crypto_prices_1h (
+      source text not null,
+      symbol text not null,
+      interval text not null,
+      open_time_ms bigint not null,
+      utc_time timestamptz,
+      open numeric,
+      high numeric,
+      low numeric,
+      close numeric,
+      volume numeric,
+      updated_at timestamptz default now(),
+      primary key (source, symbol, interval, open_time_ms)
+    )`,
+  );
+  cryptoPriceTableReady = true;
+}
+
+export async function upsertCryptoRows(
+  source: string,
+  symbol: string,
+  interval: string,
+  rows: KlineRow[],
+) {
+  const filtered = rows.filter((row) => Number.isFinite(Number(row.time)));
+  if (filtered.length === 0) return;
+  await ensureCryptoPriceTable();
+  const now = new Date().toISOString();
+  const payload = filtered.map((row) => ({
+    source,
+    symbol,
+    interval,
+    open_time_ms: Number(row.time),
+    utc_time: new Date(Number(row.time)).toISOString(),
+    open: row.open ?? null,
+    high: row.high ?? null,
+    low: row.low ?? null,
+    close: row.close ?? null,
+    volume: row.volume ?? null,
+    updated_at: now,
+  }));
+  const columns = [
+    "source",
+    "symbol",
+    "interval",
+    "open_time_ms",
+    "utc_time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "updated_at",
+  ];
+  for (let i = 0; i < payload.length; i += CRYPTO_DB_BATCH_SIZE) {
+    const batch = payload.slice(i, i + CRYPTO_DB_BATCH_SIZE);
+    const values: any[] = [];
+    const placeholders = batch
+      .map((row) => {
+        const startIndex = values.length;
+        columns.forEach((column) => values.push((row as any)[column]));
+        const params = columns.map((_, index) => `$${startIndex + index + 1}`);
+        return `(${params.join(",")})`;
+      })
+      .join(",");
+    const sql = `insert into crypto_prices_1h (${columns.join(",")}) values ${placeholders}
+      on conflict (source, symbol, interval, open_time_ms) do update set
+        utc_time = excluded.utc_time,
+        open = excluded.open,
+        high = excluded.high,
+        low = excluded.low,
+        close = excluded.close,
+        volume = excluded.volume,
+        updated_at = excluded.updated_at`;
+    await query(sql, values);
+  }
+}
+
+async function getLatestCryptoSyncTime(
+  source: string,
+  symbol: string,
+  interval: string,
+): Promise<number | undefined> {
+  try {
+    await ensureCryptoSyncTable();
+    const { rows } = await query<{ last_time: string | number | null }>(
+      "select last_time from crypto_sync_state where source = $1 and symbol = $2 and interval = $3",
+      [source, symbol, interval],
+    );
+    const value = rows[0]?.last_time ?? null;
+    if (value === null || value === undefined) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  } catch (error) {
+    log("warn", "crypto sync state query failed", { message: (error as Error).message });
+    return undefined;
+  }
+}
+
+export async function upsertCryptoSyncTime(
+  source: string,
+  symbol: string,
+  interval: string,
+  lastTime: number,
+) {
+  if (!Number.isFinite(lastTime)) return;
+  try {
+    await ensureCryptoSyncTable();
+    await query(
+      `insert into crypto_sync_state (source, symbol, interval, last_time, updated_at)
+       values ($1, $2, $3, $4, $5)
+       on conflict (source, symbol, interval) do update set
+         last_time = excluded.last_time,
+         updated_at = excluded.updated_at`,
+      [source, symbol, interval, Math.floor(lastTime), new Date().toISOString()],
+    );
+  } catch (error) {
+    log("warn", "crypto sync state upsert failed", { message: (error as Error).message });
+  }
+}
 
 // === 代理工具 ===
 /**
@@ -532,7 +676,7 @@ async function downloadTargetHyperliquid(
       startTime,
       endTime,
     });
-    return true;
+    return undefined;
   }
 
   const maxCandles = Number(
@@ -543,6 +687,7 @@ async function downloadTargetHyperliquid(
   const windowMs = intervalMs * maxCandles;
   let cursor = startTime;
   let hasData = false;
+  let latestTime: number | undefined;
   while (cursor <= endTime) {
     const windowEnd = Math.min(endTime, cursor + windowMs);
     let response: any = null;
@@ -617,6 +762,7 @@ async function downloadTargetHyperliquid(
     const rows = buildRowsFromCandles(data);
     if (rows.length > 0) {
       hasData = true;
+      await upsertCryptoRows(target.source, target.symbol, interval, rows);
       if (writeToFile) {
         await appendCsvRows(target.outputPath, rows, { columns: CSV_COLUMNS });
       }
@@ -627,6 +773,7 @@ async function downloadTargetHyperliquid(
       if (!Number.isFinite(lastOpenTime)) {
         break;
       }
+      latestTime = lastOpenTime;
       log("info", "crypto download batch", {
         target: target.name,
         count: rows.length,
@@ -640,7 +787,7 @@ async function downloadTargetHyperliquid(
       await sleep(delayMs);
     }
   }
-  return hasData;
+  return hasData ? latestTime : undefined;
 }
 
 async function downloadTargetBinance(
@@ -670,7 +817,7 @@ async function downloadTargetBinance(
       startTime,
       endTime,
     });
-    return true;
+    return undefined;
   }
 
   const maxCandles = Number(
@@ -681,6 +828,7 @@ async function downloadTargetBinance(
   const windowMs = intervalMs * maxCandles;
   let cursor = startTime;
   let hasData = false;
+  let latestTime: number | undefined;
   while (cursor <= endTime) {
     const windowEnd = Math.min(endTime, cursor + windowMs);
     const params = new URLSearchParams({
@@ -734,6 +882,7 @@ async function downloadTargetBinance(
     const rows = buildRowsFromBinance(payload);
     if (rows.length > 0) {
       hasData = true;
+      await upsertCryptoRows(target.source, target.symbol, interval, rows);
       if (writeToFile) {
         await appendCsvRows(target.outputPath, rows, { columns: CSV_COLUMNS });
       }
@@ -744,6 +893,7 @@ async function downloadTargetBinance(
       if (!Number.isFinite(lastOpenTime)) {
         break;
       }
+      latestTime = lastOpenTime;
       log("info", "crypto download batch", {
         target: target.name,
         count: rows.length,
@@ -760,7 +910,7 @@ async function downloadTargetBinance(
   if (!hasData) {
     throw new Error("BINANCE_NO_DATA");
   }
-  return true;
+  return latestTime;
 }
 
 // === 对外入口 ===
@@ -779,6 +929,13 @@ export async function downloadCryptoPrices(options: CryptoDownloadOptions) {
   const coins = (options.coins || []).map((value) => value.trim()).filter(Boolean);
   const source = (options.source || "hyperliquid") as PriceSource;
   const forceStartTime = Boolean(options.forceStartTime);
+  const shouldFillGaps =
+    String(process.env.CRYPTO_GAP_FILL ?? "").toLowerCase() === "true" ||
+    String(process.env.CRYPTO_GAP_FILL ?? "") === "1";
+  const shouldValidate =
+    String(process.env.CRYPTO_VALIDATE_CSV ?? "").toLowerCase() === "true" ||
+    String(process.env.CRYPTO_VALIDATE_CSV ?? "") === "1";
+  const allowCsvRead = forceStartTime || shouldFillGaps || shouldValidate;
 
   const intervalMs = intervalToMs(interval);
   if (!intervalMs) {
@@ -802,10 +959,13 @@ export async function downloadCryptoPrices(options: CryptoDownloadOptions) {
       source,
     };
 
-    const existingRows = forceStartTime ? await loadCsvKlineRows(outputPath) : [];
-    const lastTime = hasStartTime || forceStartTime
-      ? undefined
-      : await readLatestTimeFromCsv(outputPath, "time");
+    const existingRows =
+      forceStartTime && allowCsvRead ? await loadCsvKlineRows(outputPath) : [];
+    const stateSymbol = target.symbol;
+    const lastTime =
+      hasStartTime || forceStartTime
+        ? undefined
+        : await getLatestCryptoSyncTime(source, stateSymbol, interval);
     if (!hasStartTime && !forceStartTime && shouldSkipFreshDownload(nowMs, lastTime, intervalMs)) {
       log("info", "crypto download skip (latest within interval)", {
         target: target.name,
@@ -819,9 +979,10 @@ export async function downloadCryptoPrices(options: CryptoDownloadOptions) {
       typeof lastTime === "number" ? lastTime + intervalMs : defaultStartMs;
 
     const collector: KlineRow[] = [];
+    let latestTime: number | undefined;
     try {
       if (source === "binance") {
-        await downloadTargetBinance(
+        latestTime = await downloadTargetBinance(
           target,
           interval,
           startTime,
@@ -834,7 +995,7 @@ export async function downloadCryptoPrices(options: CryptoDownloadOptions) {
           },
         );
       } else {
-        await downloadTargetHyperliquid(
+        latestTime = await downloadTargetHyperliquid(
           target,
           interval,
           startTime,
@@ -854,6 +1015,9 @@ export async function downloadCryptoPrices(options: CryptoDownloadOptions) {
       });
       continue;
     }
+    if (Number.isFinite(latestTime)) {
+      await upsertCryptoSyncTime(source, stateSymbol, interval, latestTime as number);
+    }
 
     if (forceStartTime && hasStartTime) {
       const replaceStart = Number(options.startTimeMs);
@@ -864,15 +1028,37 @@ export async function downloadCryptoPrices(options: CryptoDownloadOptions) {
       const merged = retained.concat(collector);
       await fs.mkdir(path.dirname(outputPath), { recursive: true });
       await writeCsvKlineRows(outputPath, merged);
-      await validateCsvIntervals(outputPath, intervalMs);
+      if (shouldValidate) {
+        await validateCsvIntervals(outputPath, intervalMs);
+      }
+      const mergedLast = merged.length > 0 ? merged[merged.length - 1]?.time : undefined;
+      const updateTime = Number.isFinite(mergedLast)
+        ? (mergedLast as number)
+        : latestTime;
+      if (Number.isFinite(updateTime)) {
+        await upsertCryptoSyncTime(source, stateSymbol, interval, updateTime as number);
+      }
       continue;
     }
 
-    const mergedRows = await loadCsvKlineRows(outputPath);
-    if (mergedRows.length > 0) {
-      await writeCsvKlineRows(outputPath, mergedRows);
-      await fillCsvGaps(target, interval, intervalMs, delayMs, dispatcher);
-      await validateCsvIntervals(outputPath, intervalMs);
+    if (allowCsvRead) {
+      const mergedRows = await loadCsvKlineRows(outputPath);
+      if (mergedRows.length > 0) {
+        await writeCsvKlineRows(outputPath, mergedRows);
+        if (shouldFillGaps) {
+          await fillCsvGaps(target, interval, intervalMs, delayMs, dispatcher);
+        }
+        if (shouldValidate) {
+          await validateCsvIntervals(outputPath, intervalMs);
+        }
+        const mergedLast = mergedRows[mergedRows.length - 1]?.time;
+        const updateTime = Number.isFinite(mergedLast)
+          ? (mergedLast as number)
+          : latestTime;
+        if (Number.isFinite(updateTime)) {
+          await upsertCryptoSyncTime(source, stateSymbol, interval, updateTime as number);
+        }
+      }
     }
   }
 }

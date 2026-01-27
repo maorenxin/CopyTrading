@@ -19,8 +19,8 @@
 -->
 
 **语言/版本**: TypeScript（Node.js 运行时）  
-**主要依赖**: `@supabase/supabase-js`、现有后端服务层  
-**存储**: 本地 Supabase（PostgreSQL）  
+**主要依赖**: 现有后端服务层  
+**存储**: 本地 PostgreSQL  
 **测试**: 现有仓库未配置自动化测试（本阶段以手工验收为主）  
 **目标平台**: 本地服务器环境 + 现有 Web/Server 仓库结构  
 **项目类型**: Web 应用（前端 + Node 服务端）  
@@ -80,7 +80,7 @@ server/
 详见 `/Users/mao/code/CopyTradingCodex/specs/003-vault-data-sync/research.md`。
 
 - 数据源优先级采用官方接口优先、页面回退兜底。
-- 本地 Supabase 与线上结构保持同构，降低迁移成本。
+- 本地 PostgreSQL 与线上结构保持同构，降低迁移成本。
 - 同步记录必须保留来源与时间，支持审计与追溯。
 - WebSocket 实时监听覆盖年化收益 Top10 Vault。
 - Vault 地址去重采用覆盖写入。

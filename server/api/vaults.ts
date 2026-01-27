@@ -1,12 +1,14 @@
 import type { RouteDefinition } from "./router";
 import {
-  getVaultById,
+  getVaultByAddress,
+  getVaultQuantstats,
   listVaultDepositors,
+  listVaultFunding,
+  listVaultLedger,
   listVaultPositions,
   listVaultTrades,
   listVaults,
 } from "../services/vault-repository";
-import { runVaultSync } from "../jobs/vault-sync";
 
 export const vaultRoutes: RouteDefinition[] = [
   {
@@ -22,53 +24,79 @@ export const vaultRoutes: RouteDefinition[] = [
     },
   },
   {
-    method: "POST",
-    path: "/vaults/sync",
-    handler: async () => {
-      const result = await runVaultSync();
-      return { syncRunId: result.syncRunId, status: result.status };
-    },
-  },
-  {
     method: "GET",
-    path: "/vaults/:vaultId",
+    path: "/vaults/:vaultAddress",
     handler: async (request) => {
       const params = (request as any)?.params ?? {};
-      const vaultId = params.vaultId as string;
-      const item = await getVaultById(vaultId);
+      const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
+      const item = await getVaultByAddress(vaultAddress);
       return item ?? {};
     },
   },
   {
     method: "GET",
-    path: "/vaults/:vaultId/trades",
+    path: "/vaults/:vaultAddress/trades",
     handler: async (request) => {
       const params = (request as any)?.params ?? {};
       const query = (request as any)?.query ?? {};
-      const vaultId = params.vaultId as string;
+      const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
       const limit = Math.min(Number(query.limit ?? 200), 1000);
-      const items = await listVaultTrades(vaultId, limit);
+      const items = await listVaultTrades(vaultAddress, limit);
       return { items };
     },
   },
   {
     method: "GET",
-    path: "/vaults/:vaultId/positions",
+    path: "/vaults/:vaultAddress/funding",
     handler: async (request) => {
       const params = (request as any)?.params ?? {};
-      const vaultId = params.vaultId as string;
-      const items = await listVaultPositions(vaultId);
+      const query = (request as any)?.query ?? {};
+      const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
+      const limit = Math.min(Number(query.limit ?? 200), 1000);
+      const items = await listVaultFunding(vaultAddress, limit);
       return { items };
     },
   },
   {
     method: "GET",
-    path: "/vaults/:vaultId/depositors",
+    path: "/vaults/:vaultAddress/ledger",
     handler: async (request) => {
       const params = (request as any)?.params ?? {};
-      const vaultId = params.vaultId as string;
-      const items = await listVaultDepositors(vaultId);
+      const query = (request as any)?.query ?? {};
+      const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
+      const limit = Math.min(Number(query.limit ?? 200), 1000);
+      const items = await listVaultLedger(vaultAddress, limit);
       return { items };
+    },
+  },
+  {
+    method: "GET",
+    path: "/vaults/:vaultAddress/positions",
+    handler: async (request) => {
+      const params = (request as any)?.params ?? {};
+      const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
+      const items = await listVaultPositions(vaultAddress);
+      return { items };
+    },
+  },
+  {
+    method: "GET",
+    path: "/vaults/:vaultAddress/depositors",
+    handler: async (request) => {
+      const params = (request as any)?.params ?? {};
+      const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
+      const items = await listVaultDepositors(vaultAddress);
+      return { items };
+    },
+  },
+  {
+    method: "GET",
+    path: "/vaults/:vaultAddress/quantstats",
+    handler: async (request) => {
+      const params = (request as any)?.params ?? {};
+      const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
+      const item = await getVaultQuantstats(vaultAddress);
+      return item ?? {};
     },
   },
 ];

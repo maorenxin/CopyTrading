@@ -43,6 +43,7 @@ export interface Trader {
   followerCount: number;
   allTimeReturn: number; // percentage
   annualizedReturn: number; // ARR - Annual Return Rate percentage
+  sharpeRatio: number; // raw sharpe ratio
   maxDrawdownPercent: number; // percentage
   winRatePercent: number; // percentage
   avgTradesPerDay: number;
@@ -51,10 +52,11 @@ export interface Trader {
   balance: number; // Current balance in USDC
   timeInMarketPercent: number; // percentage of time in market
   avgHoldDays: number; // average holding period in days
-  radarScore: number; // Average of all metrics for ranking
+  radarScore: number; // Radar area score for ranking
 }
 
 export type SortOption =
+  | "radarScore"
   | "sharpe"
   | "allTimeReturn"
   | "annualizedReturn"
@@ -71,3 +73,18 @@ export type ViewMode = "card" | "table";
 export type Language = "en" | "cn";
 export type TimePeriod = "7D" | "30D" | "90D" | "ALL";
 export type ColorMode = "standard" | "inverted"; // standard: up=green, down=red; inverted: up=red, down=green
+
+export interface PortfolioPosition {
+  id: string;
+  trader: Trader;
+  amount: number;
+  createdAt: number;
+}
+
+export interface PortfolioSummary {
+  totalInvested: number;
+  totalValue: number;
+  totalProfit: number;
+  avgReturnPercent: number;
+  activeCopies: number;
+}

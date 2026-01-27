@@ -11,7 +11,7 @@
 
 **目的**: 初始化本地数据环境与基础配置
 
-- [X] T001 更新本地 Supabase 表结构以支持 Vault 数据于 `server/db/schema.sql`
+- [X] T001 更新本地 PostgreSQL 表结构以支持 Vault 数据于 `server/db/schema.sql`
 - [X] T002 添加 Vault 同步环境变量说明与代理配置说明于 `specs/003-vault-data-sync/quickstart.md`
 
 ---

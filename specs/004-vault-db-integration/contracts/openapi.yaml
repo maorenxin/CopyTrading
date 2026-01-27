@@ -1,0 +1,349 @@
+openapi: 3.0.3
+info:
+  title: Vault 数据 API
+  version: 0.1.0
+  description: 本地 PostgreSQL 中的 vault 数据与同步批次接口。
+servers:
+  - url: http://localhost:3000/api
+paths:
+  /vaults:
+    get:
+      summary: 获取 vault 列表
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 200
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: vault 列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultList'
+  /vaults/sync:
+    post:
+      summary: 触发一次 vault 同步
+      responses:
+        '200':
+          description: 同步运行结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncRunTrigger'
+  /vaults/{vaultId}:
+    get:
+      summary: 获取 vault 详情
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: vault 详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultDetail'
+  /vaults/{vaultId}/trades:
+    get:
+      summary: 获取 vault 交易列表
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 200
+      responses:
+        '200':
+          description: 交易列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultTradeList'
+  /vaults/{vaultId}/positions:
+    get:
+      summary: 获取 vault 持仓列表
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 持仓列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultPositionList'
+  /vaults/{vaultId}/depositors:
+    get:
+      summary: 获取 vault 存款人列表
+      parameters:
+        - in: path
+          name: vaultId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 存款人列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultDepositorList'
+  /sync-runs:
+    get:
+      summary: 获取同步批次列表
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: 批次列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncRunList'
+
+components:
+  schemas:
+    VaultList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VaultSummary'
+        next_cursor:
+          type: string
+          nullable: true
+    VaultSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        vault_address:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        tvl_usdc:
+          type: number
+        annualized_return:
+          type: number
+        sharpe:
+          type: number
+        max_drawdown:
+          type: number
+        last_trade_at:
+          type: string
+          format: date-time
+        last_sync_run_id:
+          type: string
+    VaultDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        vault_address:
+          type: string
+        name:
+          type: string
+        manager_address:
+          type: string
+        creator_address:
+          type: string
+        status:
+          type: string
+        description:
+          type: string
+        tvl_usdc:
+          type: number
+        all_time_return:
+          type: number
+        annualized_return:
+          type: number
+        sharpe:
+          type: number
+        max_drawdown:
+          type: number
+        last_trade_at:
+          type: string
+          format: date-time
+        last_ws_trade_at:
+          type: string
+          format: date-time
+        last_sync_run_id:
+          type: string
+    VaultTradeList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VaultTrade'
+    VaultTrade:
+      type: object
+      properties:
+        id:
+          type: string
+        vault_id:
+          type: string
+        tx_hash:
+          type: string
+        side:
+          type: string
+        price:
+          type: number
+        size:
+          type: number
+        pnl:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+        source:
+          type: string
+        sync_run_id:
+          type: string
+    VaultPositionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VaultPosition'
+    VaultPosition:
+      type: object
+      properties:
+        id:
+          type: string
+        vault_id:
+          type: string
+        symbol:
+          type: string
+        side:
+          type: string
+        leverage:
+          type: number
+        quantity:
+          type: number
+        entry_price:
+          type: number
+        mark_price:
+          type: number
+        position_value:
+          type: number
+        roe_percent:
+          type: number
+        sync_run_id:
+          type: string
+    VaultDepositorList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VaultDepositor'
+    VaultDepositor:
+      type: object
+      properties:
+        id:
+          type: string
+        vault_id:
+          type: string
+        depositor_address:
+          type: string
+        amount_usdc:
+          type: number
+        share_percent:
+          type: number
+        sync_run_id:
+          type: string
+    SyncRunTrigger:
+      type: object
+      properties:
+        sync_run_id:
+          type: string
+        status:
+          type: string
+    SyncRunList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncRun'
+    SyncRun:
+      type: object
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [running, success, partial, failed]
+        vault_count:
+          type: integer
+        success_count:
+          type: integer
+        failed_vaults:
+          type: array
+          items:
+            type: string
+        note:
+          type: string
+        reconcile_summary:
+          $ref: '#/components/schemas/ReconcileSummary'
+    ReconcileSummary:
+      type: object
+      properties:
+        csv_vaults_count:
+          type: integer
+        db_vaults_count:
+          type: integer
+        csv_trades_count:
+          type: integer
+        db_trades_count:
+          type: integer
+        csv_positions_count:
+          type: integer
+        db_positions_count:
+          type: integer
+        csv_depositors_count:
+          type: integer
+        db_depositors_count:
+          type: integer
+        diff_vaults_count:
+          type: integer
+        diff_trades_count:
+          type: integer
+        diff_positions_count:
+          type: integer
+        diff_depositors_count:
+          type: integer

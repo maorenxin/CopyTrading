@@ -2,6 +2,7 @@ import * as Papa from "papaparse";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { log } from "./logger";
+import { query } from "../db/postgres";
 
 // === 类型 ===
 export interface VaultAddressEntry {
@@ -25,6 +26,77 @@ export interface ScrapeByWindowOptions<T> {
   logContext?: Record<string, unknown>;
 }
 
+// === 数值/时间工具 ===
+const chinaFormatter = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+export function toNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * 根据交易方向与成交量计算交易后的持仓。
+ * @param startPosition - 交易前持仓。
+ * @param size - 成交数量。
+ * @param dir - 交易方向，例如 "Open Long"/"Close Short"。
+ * @returns 交易后持仓，无法计算时返回 undefined。
+ */
+export function computeEndPosition(
+  startPosition: number | undefined,
+  size: number | undefined,
+  dir: string | undefined,
+): number | undefined {
+  if (startPosition === undefined || size === undefined) return undefined;
+  if (!dir) return undefined;
+  const normalized = String(dir).toLowerCase();
+  const isOpen = normalized.includes("open");
+  const isClose = normalized.includes("close");
+  const isLong = normalized.includes("long");
+  const isShort = normalized.includes("short");
+  if ((isOpen && isLong) || (isClose && isShort)) {
+    return startPosition + size;
+  }
+  if ((isOpen && isShort) || (isClose && isLong)) {
+    return startPosition - size;
+  }
+  return undefined;
+}
+
+export function toIso(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (/^\d+$/.test(trimmed)) {
+      const parsed = Number(trimmed);
+      if (Number.isFinite(parsed)) {
+        const date = new Date(parsed);
+        return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+      }
+    }
+  }
+  const parsed = Number(value);
+  const date = Number.isFinite(parsed) ? new Date(parsed) : new Date(value as string);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+export function toChinaTimestamp(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = Number(value);
+  const date = Number.isFinite(parsed) ? new Date(parsed) : new Date(value as string);
+  return Number.isNaN(date.getTime()) ? undefined : chinaFormatter.format(date);
+}
+
 // === 解析工具 ===
 /**
  * 解析对象或 JSON 字符串为记录对象。
@@ -42,6 +114,89 @@ export function parseJsonMaybe(value: unknown): Record<string, unknown> {
     }
   }
   return {};
+}
+
+// === 数据库读取工具 ===
+/**
+ * 从数据库读取 vault 地址并按条件过滤。
+ * @param minTvl - 最小 TVL 过滤条件。
+ * @param limit - 返回条数上限。
+ * @param relationshipType - 关系类型过滤条件。
+ * @param random - 是否随机排序。
+ * @returns 去重后的 vault 列表（含可选创建时间）。
+ */
+export async function loadVaultAddressesFromDb(
+  minTvl = 1000,
+  limit = -1,
+  relationshipType = "normal",
+  random = false,
+): Promise<VaultAddressEntry[]> {
+  const conditions: string[] = [];
+  const params: Array<string | number> = [];
+
+  if (Number.isFinite(minTvl) && minTvl > 0) {
+    params.push(minTvl);
+    conditions.push(`tvl_usdc >= $${params.length}`);
+  }
+  if (relationshipType) {
+    params.push(relationshipType);
+    conditions.push(`relationship_type = $${params.length}`);
+  }
+
+  let sql = "select vault_address, create_time_millis from vault_info";
+  if (conditions.length > 0) {
+    sql += ` where ${conditions.join(" and ")}`;
+  }
+  sql += random
+    ? " order by random()"
+    : " order by annualized_return desc nulls last, vault_address asc";
+  if (limit > 0) {
+    params.push(limit);
+    sql += ` limit $${params.length}`;
+  }
+
+  try {
+    const { rows } = (await query<{
+      vault_address: string;
+      create_time_millis?: string | number;
+    }>(sql, params)) as {
+      rows: Array<{ vault_address: string; create_time_millis?: string | number }>;
+    };
+    const entries = rows.map((row) => ({
+      vaultAddress: String(row.vault_address),
+      createTimeMillis: row.create_time_millis ? Number(row.create_time_millis) : undefined,
+    }));
+    return Array.from(new Map(entries.map((entry) => [entry.vaultAddress, entry])).values());
+  } catch (error) {
+    log("warn", "load vaults from db failed", { message: (error as Error).message });
+    return [];
+  }
+}
+
+/**
+ * 从数据库中按地址查找 vault 记录。
+ * @param vaultAddress - vault 地址。
+ * @returns 匹配的 vault 记录，未找到时返回 null。
+ */
+export async function findVaultEntryByAddressFromDb(
+  vaultAddress: string,
+): Promise<VaultAddressEntry | null> {
+  const address = String(vaultAddress).toLowerCase();
+  try {
+    const { rows } = await query<{ vault_address: string; create_time_millis?: string | number }>(
+      "select vault_address, create_time_millis from vault_info where lower(vault_address) = $1 limit 1",
+      [address],
+    );
+    const row = rows?.[0];
+    if (!row?.vault_address) return null;
+    return {
+      vaultAddress: String(row.vault_address),
+      createTimeMillis: row.create_time_millis ? Number(row.create_time_millis) : undefined,
+    };
+  } catch (error) {
+    log("warn", "find vault in db failed", { message: (error as Error).message, vaultAddress });
+    return null;
+  }
 }
 
 // === 文件/CSV 工具 ===
@@ -75,9 +230,11 @@ export async function loadVaultAddressesFromCsv(
   if (parsed.errors && parsed.errors.length > 0) {
     log("warn", "vaults csv parse errors", { count: parsed.errors.length });
   }
-  const rows = Array.isArray(parsed.data) ? parsed.data : [];
+  const rows = Array.isArray(parsed.data)
+    ? (parsed.data as Array<Record<string, unknown>>)
+    : [];
   const entries = rows
-    .map((row: any) => ({
+    .map((row) => ({
       vaultAddress: row?.vaultAddress ?? row?.vault_address ?? row?.vault ?? null,
       tvl: Number(row?.tvl ?? row?.TVL ?? row?.Tvl ?? 0),
       relationshipType: row?.relationshipType ?? relationshipType,

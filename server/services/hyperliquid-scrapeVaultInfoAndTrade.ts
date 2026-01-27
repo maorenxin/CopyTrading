@@ -4,11 +4,23 @@ import { HyperliquidClient } from "./hyperliquid-client";
 import * as path from "path";
 import {
   appendCsvRows,
+  computeEndPosition,
   findVaultEntryByAddress,
   loadVaultAddressesFromCsv,
   readLatestTimeFromCsv,
   scrapeByWindow,
+  toChinaTimestamp,
+  toIso,
+  toNumber,
 } from "./hyperliquid-utils";
+import {
+  upsertVaultBasics,
+  upsertVaultNavJson,
+  upsertVaultTrades,
+  VaultBasicInput,
+  VaultNavJsonInput,
+  VaultTradeInput,
+} from "./vault-repository";
 
 // === 类型 ===
 interface VaultInfoEntry {
@@ -72,6 +84,74 @@ function buildCsvRows(entries: VaultInfoEntry[]) {
       description: details?.description ?? null,
     };
   });
+}
+
+/**
+ * 构建写入数据库的 vault 基础信息。
+ * @param entries - vault 信息列表。
+ * @returns vault 基础信息数组。
+ */
+function buildVaultBasicsInputs(entries: VaultInfoEntry[]): VaultBasicInput[] {
+  return entries
+    .map((entry) => {
+      const details = entry.details ?? {};
+      const vaultAddress = entry.vaultAddress ? String(entry.vaultAddress).toLowerCase() : "";
+      if (!vaultAddress) return null;
+      const leader = entry.leader ?? details?.leader;
+      return {
+        vaultAddress,
+        name: details?.name ?? undefined,
+        leaderAddress: leader ?? undefined,
+        managerAddress: leader ?? undefined,
+        creatorAddress: leader ?? undefined,
+        description: details?.description ?? undefined,
+      };
+    })
+    .filter(Boolean) as VaultBasicInput[];
+}
+
+/**
+ * 解析全量时间窗口的净值与 PnL 历史。
+ * @param details - vault 详情数据。
+ * @returns 净值与 PnL 历史数组。
+ */
+function extractAllTimePortfolio(details: any): {
+  accountHistory: any[];
+  pnlHistory: any[];
+} {
+  const portfolio = Array.isArray(details?.portfolio) ? details.portfolio : [];
+  const allTime = portfolio.find((item: any) => Array.isArray(item) && item[0] === "allTime");
+  const data = allTime?.[1] ?? {};
+  const accountHistory = Array.isArray(data?.accountValueHistory) ? data.accountValueHistory : [];
+  const pnlHistory = Array.isArray(data?.pnlHistory) ? data.pnlHistory : [];
+  return { accountHistory, pnlHistory };
+}
+
+/**
+ * 构建写入数据库的净值曲线数据。
+ * @param entries - vault 信息列表。
+ * @returns nav_json 写入数组。
+ */
+function buildNavJsonInputs(entries: VaultInfoEntry[]): VaultNavJsonInput[] {
+  const result: VaultNavJsonInput[] = [];
+  entries.forEach((entry) => {
+    const vaultAddress = entry.vaultAddress ? String(entry.vaultAddress).toLowerCase() : "";
+    if (!vaultAddress) return;
+    const { accountHistory } = extractAllTimePortfolio(entry.details ?? {});
+    if (!Array.isArray(accountHistory) || accountHistory.length === 0) return;
+    const navSeries = accountHistory
+      .map((point: any) => {
+        if (!Array.isArray(point) || point.length < 2) return null;
+        const timestamp = Number(point[0]);
+        const value = Number(point[1]);
+        if (!Number.isFinite(timestamp) || !Number.isFinite(value)) return null;
+        return { timestamp, value };
+      })
+      .filter(Boolean);
+    if (navSeries.length === 0) return;
+    result.push({ vaultAddress, navJson: navSeries });
+  });
+  return result;
 }
 
 /**
@@ -166,12 +246,7 @@ export async function writeVaultInfoOutputs(output: VaultInfoOutput): Promise<vo
   const pnlRows: Array<{ vault_address: string; timestamp: number; value: string }> = [];
 
   output.vaults.forEach((entry) => {
-    const details = entry.details ?? {};
-    const portfolio = Array.isArray(details?.portfolio) ? details.portfolio : [];
-    const allTime = portfolio.find((item: any) => Array.isArray(item) && item[0] === "allTime");
-    const data = allTime?.[1] ?? {};
-    const accountHistory = Array.isArray(data?.accountValueHistory) ? data.accountValueHistory : [];
-    const pnlHistory = Array.isArray(data?.pnlHistory) ? data.pnlHistory : [];
+    const { accountHistory, pnlHistory } = extractAllTimePortfolio(entry.details ?? {});
 
     accountHistory.forEach((point: any) => {
       if (!Array.isArray(point) || point.length < 2) return;
@@ -196,6 +271,16 @@ export async function writeVaultInfoOutputs(output: VaultInfoOutput): Promise<vo
   const pnlCsv = Papa.unparse(pnlRows);
   await fs.writeFile(allTimeAccountPath, accountCsv, "utf-8");
   await fs.writeFile(allTimePnlPath, pnlCsv, "utf-8");
+
+  const basicRows = buildVaultBasicsInputs(output.vaults);
+  if (basicRows.length > 0) {
+    await upsertVaultBasics(basicRows);
+  }
+
+  const navRows = buildNavJsonInputs(output.vaults);
+  if (navRows.length > 0) {
+    await upsertVaultNavJson(navRows);
+  }
 
   log("info", "vault info outputs written", {
     jsonPath,
@@ -244,6 +329,39 @@ function dedupeTrades(trades: VaultTradeEntry[]) {
     unique.push(trade);
   });
   return unique;
+}
+
+/**
+ * 构建写入数据库的交易记录。
+ * @param output - 交易输出数据。
+ * @returns 交易入库数组。
+ */
+function buildVaultTradeDbRows(output: VaultTradeOutput): VaultTradeInput[] {
+  return output.trades.map((trade, index) => {
+    const size = toNumber(trade?.sz);
+    const startPosition = toNumber(trade?.startPosition);
+    const direction = trade?.dir ?? trade?.side;
+    const endPosition = computeEndPosition(startPosition, size, direction ?? undefined);
+    const txHash =
+      trade?.tid ??
+      trade?.hash ??
+      trade?.oid ??
+      `${output.vaultAddress}-${trade?.time ?? index}`;
+    return {
+      vaultAddress: output.vaultAddress.toLowerCase(),
+      txHash: txHash ? String(txHash) : undefined,
+      coin: trade?.coin ?? undefined,
+      side: (trade?.side ?? trade?.dir) ?? undefined,
+      price: toNumber(trade?.px),
+      size,
+      startPosition,
+      endPosition,
+      pnl: toNumber(trade?.closedPnl),
+      utcTime: toIso(trade?.time),
+      timestamp: toChinaTimestamp(trade?.time),
+      source: "fills",
+    };
+  });
 }
 
 /**
@@ -338,6 +456,10 @@ export async function writeVaultTradeOutputs(output: VaultTradeOutput): Promise<
     twap_id: trade?.twapId ?? null,
   }));
   await appendCsvRows(csvPath, rows, { columns: TRADE_COLUMNS });
+  const dbRows = buildVaultTradeDbRows(output);
+  if (dbRows.length > 0) {
+    await upsertVaultTrades(dbRows);
+  }
   log("info", "vault trade outputs written", { csvPath, count: output.trades.length });
 }
 

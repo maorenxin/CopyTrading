@@ -1,26 +1,26 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { LayoutGrid, Table as TableIcon, TrendingUp, Users, Target, DollarSign, Loader2 } from 'lucide-react';
-import { Trader, Language, SortOption, ViewMode, ColorMode } from '../types/trader';
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from './ui/select';
+import { LayoutGrid, Table as TableIcon, Loader2 } from 'lucide-react';
+import { Trader, Language, SortOption, ViewMode, ColorMode, PortfolioPosition } from '../types/trader';
 import { TraderCard } from './TraderCard';
 import { TraderTableView } from './TraderTableView';
 import { TraderDetailModal } from './TraderDetailModal';
 import { CopyTradeModal } from './CopyTradeModal';
-import { WalletConnect } from './WalletConnect';
-import { LanguageSwitcher } from './LanguageSwitcher';
-import { MobilePortfolioSheet } from './MobilePortfolioSheet';
 import { Header } from './Header';
 import { t } from '../utils/translations';
 import { fetchTraders } from '../services/traders';
+import { buildPortfolioSeries, buildPortfolioSummary } from '../utils/portfolio';
 
+/**
+ * 交易平台主页面内容。
+ * @returns TradingPlatform 组件。
+ */
 export function TradingPlatform() {
   const [lang, setLang] = useState<Language>('cn');
   const [colorMode, setColorMode] = useState<ColorMode>('standard');
   const [viewMode, setViewMode] = useState<ViewMode>('table'); // Default to table view, "card" view
-  const [web3Mock, setWeb3Mock] = useState(true);
-  const [sortBy, setSortBy] = useState<SortOption>('annualizedReturn');
+  const [sortBy, setSortBy] = useState<SortOption>('radarScore');
   const [selectedTrader, setSelectedTrader] = useState<Trader | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCopyTradeModalOpen, setIsCopyTradeModalOpen] = useState(false);
@@ -28,8 +28,8 @@ export function TradingPlatform() {
   const [traders, setTraders] = useState<Trader[]>([]);
   const [displayCount, setDisplayCount] = useState(8);
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(false);
   const loadingRef = useRef<HTMLDivElement>(null);
+  const [portfolioPositions, setPortfolioPositions] = useState<PortfolioPosition[]>([]);
 
   // Table sorting state
   const [tableSortColumn, setTableSortColumn] = useState<string | null>('annualizedReturn');
@@ -71,8 +71,8 @@ export function TradingPlatform() {
             bValue = b.annualizedReturn;
             break;
           case 'sharpe':
-            aValue = a.metrics.sharpe;
-            bValue = b.metrics.sharpe;
+            aValue = a.sharpeRatio;
+            bValue = b.sharpeRatio;
             break;
           case 'followers':
             aValue = a.followerCount;
@@ -112,10 +112,12 @@ export function TradingPlatform() {
 
     // Card view sorting
     switch (sortBy) {
+      case 'radarScore':
+        return sortedTradersList.sort((a, b) => b.radarScore - a.radarScore);
       case 'annualizedReturn':
         return sortedTradersList.sort((a, b) => b.annualizedReturn - a.annualizedReturn);
       case 'sharpe':
-        return sortedTradersList.sort((a, b) => b.metrics.sharpe - a.metrics.sharpe);
+        return sortedTradersList.sort((a, b) => b.sharpeRatio - a.sharpeRatio);
       case 'maxDrawdown':
         return sortedTradersList.sort((a, b) => a.maxDrawdownPercent - b.maxDrawdownPercent); // Lower is better
       case 'balance':
@@ -142,12 +144,11 @@ export function TradingPlatform() {
     return sortedTraders.slice(0, displayCount);
   }, [sortedTraders, displayCount]);
 
-  // 加载交易员数据（失败时使用本地 mock）
+  // 加载交易员数据
   useEffect(() => {
     let isActive = true;
 
     const loadTraders = async () => {
-      setIsFetching(true);
       try {
         const items = await fetchTraders({
           view: viewMode,
@@ -161,10 +162,6 @@ export function TradingPlatform() {
       } catch {
         if (isActive) {
           setTraders([]);
-        }
-      } finally {
-        if (isActive) {
-          setIsFetching(false);
         }
       }
     };
@@ -228,6 +225,33 @@ export function TradingPlatform() {
     setIsCopyTradeModalOpen(true);
   };
 
+  const handleConfirmCopyTrade = (trader: Trader, amount: number) => {
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setPortfolioPositions((prev) => {
+      const existing = prev.find((item) => item.trader.id === trader.id);
+      if (!existing) {
+        return [...prev, { id, trader, amount, createdAt: Date.now() }];
+      }
+      return prev.map((item) =>
+        item.trader.id === trader.id
+          ? { ...item, amount: item.amount + amount, createdAt: Date.now() }
+          : item,
+      );
+    });
+  };
+
+  const portfolioSummary = useMemo(
+    () => buildPortfolioSummary(portfolioPositions),
+    [portfolioPositions],
+  );
+  const portfolioSeries = useMemo(
+    () => buildPortfolioSeries(portfolioPositions),
+    [portfolioPositions],
+  );
+
   return (
     <>
       {/* Global Header */}
@@ -236,7 +260,10 @@ export function TradingPlatform() {
         onLanguageChange={setLang}
         colorMode={colorMode}
         onColorModeChange={setColorMode}
-        web3Mock={web3Mock}
+        portfolioSummary={portfolioSummary}
+        portfolioSeries={portfolioSeries}
+        portfolioPositions={portfolioPositions}
+        onCopyTrade={handleCopyTrade}
       />
 
       <div className="min-h-screen text-white p-4 md:p-6">
@@ -281,6 +308,8 @@ export function TradingPlatform() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#1A0B2E] border-white/20 text-white">
+                      <SelectItem value="radarScore">{t('compositeRank', lang)}</SelectItem>
+                      <SelectSeparator className="my-1 h-px bg-white/10" />
                       <SelectItem value="annualizedReturn">{t('arr', lang)}</SelectItem>
                       <SelectItem value="sharpe">{t('sharpe', lang)}</SelectItem>
                       <SelectItem value="maxDrawdown">{t('maxDrawdown', lang)}</SelectItem>
@@ -360,6 +389,7 @@ export function TradingPlatform() {
             setCopyTradeTrader(null);
           }}
           lang={lang}
+          onConfirmCopy={handleConfirmCopyTrade}
         />
       </div>
     </>

@@ -3,46 +3,92 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
-import { Slider } from './ui/slider';
 import { Trader, Language } from '../types/trader';
 import { t } from '../utils/translations';
 import { formatTraderAge } from '../utils/formatTraderAge';
-import { DollarSign, TrendingUp } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatSignedPercent } from '../utils/formatPercent';
+import { getInjectedProvider, requestAccounts, requestWalletSignature } from '../utils/wallet';
 
 interface CopyTradeModalProps {
   trader: Trader | null;
   isOpen: boolean;
   onClose: () => void;
   lang: Language;
+  onConfirmCopy?: (trader: Trader, amount: number) => void;
 }
 
-export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModalProps) {
+/**
+ * 跟单确认弹窗。
+ * @param props - 弹窗参数。
+ * @returns CopyTradeModal 组件。
+ */
+export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }: CopyTradeModalProps) {
   const [amount, setAmount] = useState(100);
   const [customAmount, setCustomAmount] = useState('100');
-  const [copyInstantly, setCopyInstantly] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [stopLossEnabled, setStopLossEnabled] = useState(false);
-  const [stopLossPercent, setStopLossPercent] = useState(15);
-  const maxBalance = 10000; // Mock max balance
+  const [copyInstantly, setCopyInstantly] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const maxBalance = Math.max(0, trader?.balance ?? 0);
 
   if (!trader) return null;
 
   const presetAmounts = [100, 500, 1000];
+  const returnColor = trader.allTimeReturn >= 0 ? 'text-green-400' : 'text-red-400';
+  const ReturnIcon = trader.allTimeReturn >= 0 ? TrendingUp : TrendingDown;
 
-  const handleConfirm = () => {
-    // Mock investment confirmation
-    toast.success(
-      lang === 'en' 
-        ? `Successfully copied trade with $${amount} USDC` 
-        : `成功跟单 $${amount} USDC`,
-      {
-        description: lang === 'en'
-          ? `Following trader ${trader.address.substring(0, 8)}...`
-          : `跟随交易者 ${trader.address.substring(0, 8)}...`
-      }
-    );
-    onClose();
+  /**
+   * 拉起钱包完成交互签名。
+   * @returns 是否完成签名。
+   */
+  const requestWalletFlow = async () => {
+    const providerInfo = getInjectedProvider();
+    if (!providerInfo) {
+      toast.error(lang === 'en' ? 'Wallet not detected' : '未检测到钱包');
+      return false;
+    }
+    const accounts = await requestAccounts(providerInfo.provider);
+    const account = accounts[0];
+    if (!account) {
+      toast.error(lang === 'en' ? 'Wallet connection failed' : '钱包连接失败');
+      return false;
+    }
+    const message = lang === 'en'
+      ? `Confirm copy trade for ${trader.address} with $${amount} USDC.`
+      : `确认跟单 ${trader.address}，金额 $${amount} USDC。`;
+    const signature = await requestWalletSignature(providerInfo.provider, account, message);
+    if (!signature) {
+      toast.error(lang === 'en' ? 'Wallet signature canceled' : '已取消钱包签名');
+      return false;
+    }
+    return true;
+  };
+
+  /**
+   * 处理跟单确认。
+   * @returns 异步处理结果。
+   */
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const ok = await requestWalletFlow();
+      if (!ok) return;
+      toast.success(
+        lang === 'en'
+          ? `Trade submitted with $${amount} USDC`
+          : `已提交 $${amount} USDC 跟单`,
+        {
+          description: lang === 'en'
+            ? `Following trader ${trader.address.substring(0, 8)}...`
+            : `跟随交易者 ${trader.address.substring(0, 8)}...`,
+        },
+      );
+      onConfirmCopy?.(trader, amount);
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePresetClick = (value: number) => {
@@ -92,8 +138,8 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModal
               <div>
                 <p className="text-white/70 text-xs">{t('allTimeReturnLabel', lang)}</p>
                 <div className="flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4 text-green-400" />
-                  <p className="text-green-400">+{trader.allTimeReturn.toFixed(1)}%</p>
+                  <ReturnIcon className={`w-4 h-4 ${returnColor}`} />
+                  <p className={returnColor}>{formatSignedPercent(trader.allTimeReturn, 1)}</p>
                 </div>
               </div>
               <div>
@@ -109,7 +155,7 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModal
 
           {/* Investment Amount */}
           <div>
-            <label className="text-white mb-2 block">
+            <label htmlFor="copyTradeAmount" className="text-white mb-2 block">
               {t('investmentAmount', lang)}
             </label>
             
@@ -146,6 +192,8 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModal
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 w-4 h-4" />
               <Input
+                id="copyTradeAmount"
+                name="copyTradeAmount"
                 type="number"
                 value={customAmount}
                 onChange={(e) => handleCustomChange(e.target.value)}
@@ -164,69 +212,24 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModal
             </p>
           </div>
 
-          <div className="p-4 bg-white/10 border border-white/20 rounded-lg space-y-4">
+          <div className="p-4 bg-white/10 border border-white/20 rounded-lg space-y-3">
             <div className="flex items-center gap-3">
               <Checkbox
                 checked={copyInstantly}
-                onCheckedChange={(value) => setCopyInstantly(Boolean(value))}
+                onCheckedChange={(value: boolean | 'indeterminate') =>
+                  setCopyInstantly(Boolean(value))
+                }
                 className="border-white/50"
               />
               <span className="text-white text-sm">
                 {lang === 'en' ? 'Copy positions at market now' : '立刻市价复制仓位'}
               </span>
             </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-white/80 text-sm">
-                {lang === 'en' ? 'Advanced options' : '高级选项'}
-              </span>
-              <Button
-                variant="ghost"
-                className="text-white/70 hover:text-white"
-                onClick={() => setShowAdvanced((prev) => !prev)}
-              >
-                {showAdvanced ? (lang === 'en' ? 'Hide' : '收起') : (lang === 'en' ? 'Show' : '展开')}
-              </Button>
-            </div>
-
-            {showAdvanced && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={stopLossEnabled}
-                    onCheckedChange={(value) => setStopLossEnabled(Boolean(value))}
-                    className="border-white/50"
-                  />
-                  <span className="text-white text-sm">
-                    {lang === 'en' ? 'Copy stop loss' : '跟单止损'}
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm text-white/70">
-                    <span>{lang === 'en' ? 'Stop loss' : '止损比例'}</span>
-                    <span className="text-white">{stopLossPercent}%</span>
-                  </div>
-                  <Slider
-                    min={5}
-                    max={50}
-                    step={5}
-                    value={[stopLossPercent]}
-                    onValueChange={(value) => {
-                      if (value[0] !== undefined) {
-                        setStopLossPercent(value[0]);
-                      }
-                    }}
-                    className="data-[orientation=horizontal]:h-5"
-                    disabled={!stopLossEnabled}
-                  />
-                  <div className="flex justify-between text-xs text-white/50">
-                    <span>5%</span>
-                    <span>50%</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            <p className="text-white/50 text-xs">
+              {lang === 'en'
+                ? 'We will open your wallet to confirm the contract interaction.'
+                : '点击交易后将拉起钱包进行合约确认。'}
+            </p>
           </div>
 
           {/* Action Buttons */}
@@ -241,8 +244,9 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang }: CopyTradeModal
             <Button
               onClick={handleConfirm}
               className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+              disabled={isSubmitting}
             >
-              {t('confirmInvestment', lang)}
+              {isSubmitting ? (lang === 'en' ? 'Opening wallet...' : '拉起钱包中...') : t('confirmInvestment', lang)}
             </Button>
           </div>
         </div>

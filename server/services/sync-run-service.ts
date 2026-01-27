@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { getSupabaseClient } from "./supabase";
+import { query } from "../db/postgres";
 import { log } from "./logger";
 
 export interface SyncRunRecord {
@@ -16,7 +16,6 @@ export interface SyncRunRecord {
 }
 
 export async function createSyncRun(source: string, vaultCount: number): Promise<SyncRunRecord> {
-  const supabase = getSupabaseClient();
   const record: SyncRunRecord = {
     id: randomUUID(),
     source,
@@ -29,11 +28,26 @@ export async function createSyncRun(source: string, vaultCount: number): Promise
     note: null,
   };
 
-  const { error } = await supabase.from("sync_runs").insert(record);
-  if (error) {
-    log("error", "sync run insert failed", { message: error.message });
+  try {
+    await query(
+      "insert into sync_runs (id, source, started_at, status, vault_count, success_count, failed_vaults, websocket_vaults, note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+      [
+        record.id,
+        record.source,
+        record.started_at,
+        record.status,
+        record.vault_count,
+        record.success_count,
+        record.failed_vaults,
+        record.websocket_vaults,
+        record.note,
+      ]
+    );
+  } catch (error) {
+    log("error", "sync run insert failed", { message: (error as Error).message });
     throw error;
   }
+
   return record;
 }
 
@@ -41,33 +55,44 @@ export async function completeSyncRun(
   id: string,
   updates: Partial<SyncRunRecord>
 ): Promise<void> {
-  const supabase = getSupabaseClient();
-  const payload = {
-    ...updates,
-    finished_at: updates.finished_at ?? new Date().toISOString(),
+  const finishedAt = updates.finished_at ?? new Date().toISOString();
+  const fields: string[] = ["finished_at"]; 
+  const values: any[] = [finishedAt];
+
+  const assign = (key: keyof SyncRunRecord, value: unknown) => {
+    if (value === undefined) return;
+    fields.push(String(key));
+    values.push(value);
   };
-  const { error } = await supabase.from("sync_runs").update(payload).eq("id", id);
-  if (error) {
-    log("error", "sync run update failed", { message: error.message, id });
+
+  assign("status", updates.status);
+  assign("source", updates.source);
+  assign("vault_count", updates.vault_count);
+  assign("success_count", updates.success_count);
+  assign("failed_vaults", updates.failed_vaults);
+  assign("websocket_vaults", updates.websocket_vaults);
+  assign("note", updates.note);
+
+  const setClause = fields
+    .map((field, index) => `${field} = $${index + 2}`)
+    .join(", ");
+
+  try {
+    await query(`update sync_runs set ${setClause} where id = $1`, [id, ...values]);
+  } catch (error) {
+    log("error", "sync run update failed", { message: (error as Error).message, id });
     throw error;
   }
 }
 
 export async function attachWebsocketVaults(vaultAddresses: string[]): Promise<void> {
   if (vaultAddresses.length === 0) return;
-  const supabase = getSupabaseClient();
-  const { data } = await supabase
-    .from("sync_runs")
-    .select("id")
-    .order("started_at", { ascending: false })
-    .limit(1);
-  const latest = data?.[0]?.id;
-  if (!latest) return;
-  const { error } = await supabase
-    .from("sync_runs")
-    .update({ websocket_vaults: vaultAddresses })
-    .eq("id", latest);
-  if (error) {
-    log("warn", "sync run websocket vaults update failed", { message: error.message });
+  try {
+    const { rows } = await query("select id from sync_runs order by started_at desc limit 1");
+    const latest = rows?.[0]?.id as string | undefined;
+    if (!latest) return;
+    await query("update sync_runs set websocket_vaults = $2 where id = $1", [latest, vaultAddresses]);
+  } catch (error) {
+    log("warn", "sync run websocket vaults update failed", { message: (error as Error).message });
   }
 }

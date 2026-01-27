@@ -5,6 +5,7 @@ import {
   updateVaultWsTradeTime,
 } from "../services/vault-repository";
 import { attachWebsocketVaults } from "../services/sync-run-service";
+import { computeEndPosition } from "../services/hyperliquid-utils";
 
 const DEFAULT_BASE_URL = "https://api.hyperliquid.xyz";
 
@@ -15,21 +16,43 @@ const buildWsUrl = () => {
   return `${baseUrl}/ws`;
 };
 
+/**
+ * 订阅 websocket 实时成交流并写入数据库。
+ * @returns 执行完成的异步结果。
+ */
 export async function startVaultTradesStream(): Promise<void> {
   const toNumber = (value: unknown): number | undefined => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : undefined;
   };
+  const toIso = (value: unknown): string => {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+    const date = new Date(value as string);
+    return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+  };
+  const chinaFormatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const toChinaTimestamp = (value: unknown): string => {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return chinaFormatter.format(new Date(parsed));
+    const date = new Date(value as string);
+    return Number.isNaN(date.getTime()) ? chinaFormatter.format(new Date()) : chinaFormatter.format(date);
+  };
   const topVaults = await selectTopVaultsByAnnualReturn(10);
-  const vaultMap = new Map<string, string>();
-  const vaultAddresses = topVaults
-    .map((vault: any) => {
-      if (vault?.vault_address && vault?.id) {
-        vaultMap.set(vault.vault_address.toLowerCase(), vault.id);
-      }
-      return vault?.vault_address;
-    })
-    .filter((addr: string | undefined): addr is string => Boolean(addr));
+  const vaultAddresses: string[] = topVaults
+    .map((vault: any) => vault?.vault_address)
+    .filter((addr: string | undefined): addr is string => Boolean(addr))
+    .map((addr: string) => addr.toLowerCase());
+  const vaultSet = new Set(vaultAddresses);
 
   await attachWebsocketVaults(vaultAddresses);
 
@@ -63,25 +86,34 @@ export async function startVaultTradesStream(): Promise<void> {
 
       const data = message?.data ?? {};
       const user = (data.user ?? data?.fills?.[0]?.user ?? "").toLowerCase();
-      const vaultId = vaultMap.get(user);
-      if (!vaultId) return;
+      if (!vaultSet.has(user)) return;
 
       const fills = data.fills ?? [];
       if (!Array.isArray(fills) || fills.length === 0) return;
 
-      const trades = fills.map((fill: any, index: number) => ({
-        vaultId,
-        txHash: fill.hash ?? fill.tid ?? `${vaultId}-${index}-${fill.time ?? Date.now()}`,
-        side: fill.side ?? fill.dir,
-        price: toNumber(fill.px ?? fill.price),
-        size: toNumber(fill.sz ?? fill.size),
-        pnl: toNumber(fill.closedPnl ?? fill.pnl),
-        timestamp: fill.time ? new Date(fill.time).toISOString() : new Date().toISOString(),
-        source: "ws",
-      }));
+      const trades = fills.map((fill: any, index: number) => {
+        const size = toNumber(fill.sz ?? fill.size);
+        const dir = fill.dir ?? fill.side;
+        const startPosition = toNumber(fill.startPosition ?? fill.start_position);
+        const endPosition = computeEndPosition(startPosition, size, dir);
+        return {
+          vaultAddress: user,
+          txHash: fill.tid ?? fill.hash ?? `${user}-${index}-${fill.time ?? Date.now()}`,
+          coin: fill.coin ?? fill.symbol,
+          side: fill.side ?? fill.dir,
+          price: toNumber(fill.px ?? fill.price),
+          size,
+          startPosition,
+          endPosition,
+          pnl: toNumber(fill.closedPnl ?? fill.pnl),
+          utcTime: toIso(fill.time ?? Date.now()),
+          timestamp: toChinaTimestamp(fill.time ?? Date.now()),
+          source: "ws" as const,
+        };
+      });
 
       await upsertVaultTrades(trades);
-      await updateVaultWsTradeTime(vaultId, trades[0]?.timestamp);
+      await updateVaultWsTradeTime(user, trades[0]?.utcTime);
     } catch (error) {
       log("warn", "vault websocket message failed", { message: (error as Error).message });
     }

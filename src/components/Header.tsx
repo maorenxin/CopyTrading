@@ -1,8 +1,9 @@
-import { Language, ColorMode } from '../types/trader';
+import { ColorMode, Language, PortfolioPosition, PortfolioSummary, PnLDataPoint, Trader } from '../types/trader';
 import { WalletConnect } from './WalletConnect';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ColorModeSwitcher } from './ColorModeSwitcher';
 import { MobilePortfolioSheet } from './MobilePortfolioSheet';
+import { PortfolioDialog } from './PortfolioDialog';
 import { t } from '../utils/translations';
 
 interface HeaderProps {
@@ -10,10 +11,27 @@ interface HeaderProps {
   onLanguageChange: (lang: Language) => void;
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
-  web3Mock: boolean;
+  portfolioSummary: PortfolioSummary;
+  portfolioSeries: PnLDataPoint[];
+  portfolioPositions: PortfolioPosition[];
+  onCopyTrade: (trader: Trader) => void;
 }
 
-export function Header({ lang, onLanguageChange, colorMode, onColorModeChange, web3Mock }: HeaderProps) {
+/**
+ * 顶部导航区块，负责语言与主题切换。
+ * @param props - Header 所需参数。
+ * @returns Header 组件。
+ */
+export function Header({
+  lang,
+  onLanguageChange,
+  colorMode,
+  onColorModeChange,
+  portfolioSummary,
+  portfolioSeries,
+  portfolioPositions,
+  onCopyTrade,
+}: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-[#1A0B2E]/95 backdrop-blur-md border-b border-white/10">
       <div className="max-w-[1800px] mx-auto px-4 md:px-6 py-4">
@@ -30,10 +48,27 @@ export function Header({ lang, onLanguageChange, colorMode, onColorModeChange, w
           <div className="flex flex-wrap items-center gap-3 [&>*]:h-10">
             <ColorModeSwitcher currentMode={colorMode} onColorModeChange={onColorModeChange} />
             <LanguageSwitcher currentLang={lang} onLanguageChange={onLanguageChange} />
-            <div className="md:hidden">
-              <MobilePortfolioSheet lang={lang} />
+            <div className="hidden md:flex">
+              <PortfolioDialog
+                lang={lang}
+                colorMode={colorMode}
+                summary={portfolioSummary}
+                series={portfolioSeries}
+                positions={portfolioPositions}
+                onCopyTrade={onCopyTrade}
+              />
             </div>
-            <WalletConnect lang={lang} web3Mock={web3Mock} />
+            <div className="md:hidden">
+              <MobilePortfolioSheet
+                lang={lang}
+                colorMode={colorMode}
+                summary={portfolioSummary}
+                series={portfolioSeries}
+                positions={portfolioPositions}
+                onCopyTrade={onCopyTrade}
+              />
+            </div>
+            <WalletConnect lang={lang} />
           </div>
         </div>
       </div>

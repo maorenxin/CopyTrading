@@ -37,6 +37,10 @@ function normalizeStatsChain(input?: string) {
   return trimmed;
 }
 
+function normalizeAddress(input: string) {
+  return String(input).toLowerCase();
+}
+
 // === 客户端 ===
 export class HyperliquidClient {
   private baseUrl: string;
@@ -123,8 +127,9 @@ export class HyperliquidClient {
    * @returns vault 详情，失败则返回 null。
    */
   async fetchVaultDetails(vaultAddress: string, throwOnError = false) {
+    const address = normalizeAddress(vaultAddress);
     try {
-      return await this.postInfo("vaultDetails", { vaultAddress });
+      return await this.postInfo("vaultDetails", { vaultAddress: address });
     } catch (error) {
       log("warn", "fetchVaultDetails failed", { message: (error as Error).message, vaultAddress });
       if (throwOnError) {
@@ -141,8 +146,9 @@ export class HyperliquidClient {
    * @returns 交易记录，失败则返回 null。
    */
   async fetchVaultTrades(vaultAddress: string, throwOnError = false) {
+    const address = normalizeAddress(vaultAddress);
     try {
-      return await this.postInfo("vaultTrades", { vaultAddress });
+      return await this.postInfo("vaultTrades", { vaultAddress: address });
     } catch (error) {
       log("warn", "fetchVaultTrades failed", { message: (error as Error).message, vaultAddress });
       if (throwOnError) {
@@ -159,8 +165,9 @@ export class HyperliquidClient {
    * @returns 持仓信息，失败则返回 null。
    */
   async fetchVaultPositions(vaultAddress: string, throwOnError = false) {
+    const address = normalizeAddress(vaultAddress);
     try {
-      return await this.postInfo("vaultPositions", { vaultAddress });
+      return await this.postInfo("vaultPositions", { vaultAddress: address });
     } catch (error) {
       log("warn", "fetchVaultPositions failed", { message: (error as Error).message, vaultAddress });
       if (throwOnError) {
@@ -177,8 +184,9 @@ export class HyperliquidClient {
    * @returns 出资人列表，失败则返回 null。
    */
   async fetchVaultDepositors(vaultAddress: string, throwOnError = false) {
+    const address = normalizeAddress(vaultAddress);
     try {
-      return await this.postInfo("vaultDepositors", { vaultAddress });
+      return await this.postInfo("vaultDepositors", { vaultAddress: address });
     } catch (error) {
       log("warn", "fetchVaultDepositors failed", { message: (error as Error).message, vaultAddress });
       if (throwOnError) {
@@ -204,9 +212,10 @@ export class HyperliquidClient {
     aggregateByTime = false,
     throwOnError = false,
   ) {
+    const address = normalizeAddress(user);
     try {
       return await this.postInfo("userFillsByTime", {
-        user,
+        user: address,
         startTime,
         endTime,
         aggregateByTime,
@@ -234,9 +243,10 @@ export class HyperliquidClient {
     endTime?: number,
     throwOnError = false,
   ) {
+    const address = normalizeAddress(user);
     try {
       return await this.postInfo("userNonFundingLedgerUpdates", {
-        user,
+        user: address,
         startTime,
         endTime,
       });
@@ -266,9 +276,10 @@ export class HyperliquidClient {
     endTime?: number,
     throwOnError = false,
   ) {
+    const address = normalizeAddress(user);
     try {
       return await this.postInfo("userFunding", {
-        user,
+        user: address,
         startTime,
         endTime,
       });

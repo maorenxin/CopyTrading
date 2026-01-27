@@ -3,12 +3,17 @@ import { log } from "./logger";
 import * as path from "path";
 import {
   appendCsvRows,
+  toChinaTimestamp,
+  toIso,
+  toNumber,
   findVaultEntryByAddress,
+  findVaultEntryByAddressFromDb,
   loadVaultAddressesFromCsv,
+  loadVaultAddressesFromDb,
   parseJsonMaybe,
-  readLatestTimeFromCsv,
   scrapeByWindow,
 } from "./hyperliquid-utils";
+import { getLatestVaultLedgerUtcTime, upsertVaultLedger } from "./vault-repository";
 
 // === 类型 ===
 interface LedgerDelta {
@@ -165,19 +170,21 @@ export async function scrapeUserNonFundingLedgerForVault(
   const csvPath = path.join(outputDir, `${normalizedAddress}.csv`);
   let baseStartTime = options.createTimeMillis;
   if (typeof baseStartTime !== "number" || !Number.isFinite(baseStartTime)) {
-    const entry = await findVaultEntryByAddress(normalizedAddress);
+    const entry =
+      (await findVaultEntryByAddressFromDb(normalizedAddress)) ??
+      (await findVaultEntryByAddress(normalizedAddress));
     baseStartTime = entry?.createTimeMillis;
   }
   if (typeof baseStartTime !== "number" || !Number.isFinite(baseStartTime)) {
     baseStartTime = Date.now() - 3 * 365 * 24 * 60 * 60 * 1000;
   }
 
-  const latestTime = await readLatestTimeFromCsv(csvPath, "time");
+  const latestDbTime = await getLatestVaultLedgerUtcTime(normalizedAddress);
   const startTime =
     typeof options.startTime === "number"
       ? options.startTime
-      : typeof latestTime === "number" && latestTime >= baseStartTime
-        ? latestTime + 1
+      : typeof latestDbTime === "number" && latestDbTime >= baseStartTime
+        ? latestDbTime + 1
         : baseStartTime;
   const endTime = typeof options.endTime === "number" ? options.endTime : Number(Date.now());
   const windowMs =
@@ -188,7 +195,7 @@ export async function scrapeUserNonFundingLedgerForVault(
   log("info", "user non-funding ledger scrape start", {
     vaultAddress: normalizedAddress,
     createTimeMillis: baseStartTime ?? null,
-    resumeFromTime: latestTime ?? null,
+    resumeFromTime: latestDbTime ?? null,
   });
 
   const output = await scrapeUserNonFundingLedgerHistory(normalizedAddress, {
@@ -198,6 +205,18 @@ export async function scrapeUserNonFundingLedgerForVault(
   });
   const rows = buildCsvRows(output.updates, normalizedAddress);
   await appendCsvRows(csvPath, rows, { columns: LEDGER_COLUMNS });
+  const dbRows = rows.map((row) => ({
+    vaultAddress: normalizedAddress,
+    utcTime: toIso(row.time),
+    timestamp: toChinaTimestamp(row.time),
+    txHash: row.hash ?? undefined,
+    ledgerType: row.ledge_type ?? undefined,
+    usdc: toNumber(row.usdc),
+    commission: toNumber(row.commission),
+  }));
+  if (dbRows.length > 0) {
+    await upsertVaultLedger(dbRows);
+  }
   log("info", "user non-funding ledger written", {
     vaultAddress: normalizedAddress,
     csvPath,
@@ -215,7 +234,10 @@ async function run() {
   const limit = Number(process.env.VAULTS_LEDGER_LIMIT ?? -1);
   const relationshipType = process.env.VAULTS_RELATIONSHIP_TYPE ?? "normal";
   const outputDir = process.env.VAULT_NONFUNDING_OUTPUT_DIR || "vault_nonfunding_ledger";
-  const targets = await loadVaultAddressesFromCsv(minTvl, limit, relationshipType);
+  const dbTargets = await loadVaultAddressesFromDb(minTvl, limit, relationshipType);
+  const targets = dbTargets.length
+    ? dbTargets
+    : await loadVaultAddressesFromCsv(minTvl, limit, relationshipType);
   if (targets.length === 0) {
     log("warn", "no vaults matched tvl filter", { minTvl, relationshipType });
     return;

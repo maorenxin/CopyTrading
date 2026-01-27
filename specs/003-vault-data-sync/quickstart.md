@@ -2,14 +2,13 @@
 
 ## 准备
 
-- 确认本地 Supabase 环境可用，已包含 Vault 数据表结构。
-- 设置必要的环境变量（如本地 Supabase URL 与密钥）。
+- 确认本地 PostgreSQL 可用，已包含 Vault 数据表结构。
+- 设置必要的环境变量（如本地数据库连接地址）。
 - 确认代理 `127.0.0.1:9090` 可用（如需访问外部数据源）。
 
 **建议环境变量**:
 
-- `SUPABASE_URL`: 本地 Supabase 实例地址
-- `SUPABASE_SECRET_KEY`: 本地 Supabase 服务密钥
+- `DATABASE_URL`: 本地 PostgreSQL 连接地址
 - `HTTP_PROXY` / `HTTPS_PROXY`: `http://127.0.0.1:9090`
 
 ## 核心验证场景

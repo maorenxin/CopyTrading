@@ -1,0 +1,176 @@
+{
+  "generatedAt": "2026-01-24T02:26:36.923Z",
+  "consistent": false,
+  "totals": {
+    "vaults": 1,
+    "vaultsInfo": {
+      "csv": 8949,
+      "db": 8949,
+      "missing": 0,
+      "extra": 0,
+      "mismatched": 1
+    },
+    "quantstats": {
+      "csv": 248,
+      "db": 248,
+      "missing": 0,
+      "extra": 0,
+      "mismatched": 247
+    },
+    "trades": {
+      "csv": 69,
+      "db": 69,
+      "missing": 0,
+      "extra": 0,
+      "mismatched": 0
+    },
+    "funding": {
+      "csv": 1169,
+      "db": 1169,
+      "missing": 0,
+      "extra": 0,
+      "mismatched": 0
+    },
+    "ledger": {
+      "csv": 21,
+      "db": 21,
+      "missing": 0,
+      "extra": 0,
+      "mismatched": 0
+    }
+  },
+  "vaultsInfo": {
+    "csvCount": 8949,
+    "dbCount": 8949,
+    "missingInDb": 0,
+    "extraInDb": 0,
+    "fieldMismatches": 1,
+    "sampleMissing": [],
+    "sampleExtra": [],
+    "sampleMismatches": [
+      {
+        "vaultAddress": "0x50e2fe552727a4b8692c192b4f96d1a6b0d44394",
+        "fields": [
+          "name",
+          "leader_address",
+          "manager_address",
+          "creator_address",
+          "status",
+          "is_closed",
+          "relationship_type",
+          "create_time_millis",
+          "description",
+          "tvl_usdc",
+          "apr",
+          "annualized_return"
+        ]
+      }
+    ]
+  },
+  "quantstats": {
+    "csvCount": 248,
+    "dbCount": 248,
+    "missingInDb": 0,
+    "extraInDb": 0,
+    "fieldMismatches": 247,
+    "sampleMissing": [],
+    "sampleExtra": [],
+    "sampleMismatches": [
+      {
+        "vaultAddress": "0x1e37a337ed460039d1b15bd3bc489de789768d5e",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0x45e7014f092c5f9c39482caec131346f13ac5e73",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0x115849ce84370f25cadcf0d348510d73837e1aa5",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0xb1505ad1a4c7755e0eb236aa2f4327bfc3474768",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0xf967239debef10dbc78e9bbbb2d8a16b72a614eb",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0xa6a34f0bf2ccea9a1ddf9e9a973f17c498dc5e40",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0x07fd993f0fa3a185f7207adccd29f7a87404689d",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0xd6e56265890b76413d1d527eb9b75e334c0c5b42",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0x914434e8a235cb608a94a5f70ab8c40927152a24",
+        "fields": [
+          "metrics_window"
+        ]
+      },
+      {
+        "vaultAddress": "0xc179e03922afe8fa9533d3f896338b9fb87ce0c8",
+        "fields": [
+          "metrics_window"
+        ]
+      }
+    ]
+  },
+  "vaults": [
+    {
+      "vaultAddress": "0x50e2fe552727a4b8692c192b4f96d1a6b0d44394",
+      "trades": {
+        "csvCount": 69,
+        "dbCount": 69,
+        "missingInDb": 0,
+        "extraInDb": 0,
+        "fieldMismatches": 0,
+        "sampleMissing": [],
+        "sampleExtra": [],
+        "sampleMismatches": []
+      },
+      "funding": {
+        "csvCount": 1169,
+        "dbCount": 1169,
+        "missingInDb": 0,
+        "extraInDb": 0,
+        "fieldMismatches": 0,
+        "sampleMissing": [],
+        "sampleExtra": [],
+        "sampleMismatches": []
+      },
+      "ledger": {
+        "csvCount": 21,
+        "dbCount": 21,
+        "missingInDb": 0,
+        "extraInDb": 0,
+        "fieldMismatches": 0,
+        "sampleMissing": [],
+        "sampleExtra": [],
+        "sampleMismatches": []
+      }
+    }
+  ]
+}

@@ -27,15 +27,37 @@ export function getTimeAgo(timestamp: number, lang: Language): string {
   }
 }
 
-export function getLastTradeCategory(timestamp: number): string {
+export function getLastTradeCategory(timestamp: number, lang: Language): string {
   const now = Date.now();
   const diff = now - timestamp;
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  
-  if (days <= 1) return '1 day';
-  if (days <= 7) return '7 days';
-  if (days <= 30) return '30 days';
-  if (days <= 90) return '90 days';
-  if (days <= 365) return '1 year';
-  return '1+ year';
+
+  const labels = {
+    en: {
+      day: '1 day',
+      week: '7 days',
+      month: '30 days',
+      quarter: '90 days',
+      year: '1 year',
+      long: '1+ year',
+    },
+    cn: {
+      day: '1天',
+      week: '7天',
+      month: '30天',
+      quarter: '90天',
+      year: '1年',
+      long: '1年以上',
+    },
+  };
+
+  if (!Number.isFinite(days) || days < 0) {
+    return lang === 'en' ? '--' : '--';
+  }
+  if (days <= 1) return labels[lang].day;
+  if (days <= 7) return labels[lang].week;
+  if (days <= 30) return labels[lang].month;
+  if (days <= 90) return labels[lang].quarter;
+  if (days <= 365) return labels[lang].year;
+  return labels[lang].long;
 }

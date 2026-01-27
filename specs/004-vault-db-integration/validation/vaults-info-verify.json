@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-01-24T06:47:26.033Z",
+  "consistent": true,
+  "vaultsInfo": {
+    "csvCount": 8958,
+    "dbCount": 8958,
+    "missingInDb": [],
+    "extraInDb": [],
+    "fieldMismatches": []
+  },
+  "quantstatsInfo": {
+    "csvCount": 248,
+    "dbCount": 248,
+    "missingInDb": [],
+    "extraInDb": [],
+    "fieldMismatches": []
+  },
+  "nullChecks": {
+    "base": {
+      "totalRows": 8958,
+      "nullRows": 0,
+      "samples": []
+    },
+    "quantstats": {
+      "totalRows": 248,
+      "nullRows": 0,
+      "samples": []
+    }
+  }
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import math
 import os
 import subprocess
@@ -19,6 +20,29 @@ _COIN_SYMBOL_OVERRIDES = {
 
 
 # === 通用工具 ===
+def sync_quantstats_to_db(root_dir: Path) -> None:
+    """
+    调用 Node 脚本将 quantstats CSV 写入数据库。
+    参数:
+        root_dir: 项目根目录。
+    返回:
+        无。
+    """
+    script_path = root_dir / "server" / "scripts" / "vault-quantstats-sync.js"
+    if not script_path.exists():
+        print(f"[warn] quantstats db sync script not found: {script_path}")
+        return
+    env = os.environ.copy()
+    try:
+        node_bin = env.get("NODE_BIN")
+        if not node_bin:
+            candidate = Path("/opt/homebrew/opt/node@20/bin/node")
+            node_bin = str(candidate) if candidate.exists() else "node"
+        subprocess.run([node_bin, str(script_path)], check=True, env=env)
+    except Exception as exc:
+        print(f"[warn] quantstats db sync failed: {exc}")
+
+
 def _normalize_column(name: str) -> str:
     """
     规范化字段名，便于模糊匹配。
@@ -305,6 +329,114 @@ def load_cashflows(csv_path: Path) -> pd.DataFrame:
     out["amount"] = values.loc[out.index]
     out = out[["time", "amount"]].dropna().sort_values("time")
     return out
+
+
+def load_ledger_events(csv_path: Path) -> pd.DataFrame:
+    """
+    读取账本 CSV，提取时间与类型信息。
+    参数:
+        csv_path: CSV 路径。
+    返回:
+        包含 time 与 ledge_type 的 DataFrame。
+    """
+    if not csv_path.exists():
+        return pd.DataFrame(columns=["time", "ledge_type"])
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as exc:
+        print(f"[warn] failed reading ledger {csv_path.name}: {exc}")
+        return pd.DataFrame(columns=["time", "ledge_type"])
+    if df.empty:
+        return pd.DataFrame(columns=["time", "ledge_type"])
+
+    time_col = None
+    type_col = None
+    for col in df.columns:
+        key = _normalize_column(col)
+        if key in _TIME_KEYS and time_col is None:
+            time_col = col
+        if key in {"ledgetype", "ledger", "ledgertype", "type"} and type_col is None:
+            type_col = col
+    if not time_col or not type_col:
+        return pd.DataFrame(columns=["time", "ledge_type"])
+
+    time_ms = pd.to_numeric(df[time_col], errors="coerce")
+    out = df.loc[time_ms.notna()].copy()
+    if out.empty:
+        return pd.DataFrame(columns=["time", "ledge_type"])
+    out["time"] = _to_resample_time_from_ms(time_ms.loc[out.index])
+    out["ledge_type"] = out[type_col].astype(str)
+    return out[["time", "ledge_type"]].dropna().sort_values("time")
+
+
+def compute_follower_stats(ledger_events: pd.DataFrame) -> tuple[int, float]:
+    """
+    基于账本的 deposit/withdraw 事件估算跟单人数与人均持仓时长。
+    参数:
+        ledger_events: 账本事件 DataFrame。
+    返回:
+        (当前跟单人数, 平均持仓时长_天)。
+    """
+    if ledger_events is None or ledger_events.empty:
+        return 0, 0.0
+    events = ledger_events.copy()
+    events["ledge_type"] = events["ledge_type"].astype(str).str.lower()
+    events = events[events["ledge_type"].str.contains("deposit|withdraw", na=False)]
+    if events.empty:
+        return 0, 0.0
+    events = events.sort_values("time")
+    pending: list[pd.Timestamp] = []
+    durations: list[float] = []
+    for _, row in events.iterrows():
+        ledge_type = row["ledge_type"]
+        event_time = row["time"]
+        if pd.isna(event_time):
+            continue
+        if "deposit" in ledge_type:
+            pending.append(event_time)
+            continue
+        if "withdraw" in ledge_type and pending:
+            start_time = pending.pop(0)
+            durations.append((event_time - start_time).total_seconds())
+    now = pd.Timestamp.now(tz=_RESAMPLE_TZ)
+    for start_time in pending:
+        durations.append((now - start_time).total_seconds())
+    avg_days = float(sum(durations) / len(durations) / 86400.0) if durations else 0.0
+    return len(pending), avg_days
+
+
+def compute_avg_trades_per_day(trades_df: pd.DataFrame) -> float:
+    """
+    根据成交记录计算日均交易次数。
+    参数:
+        trades_df: 成交 DataFrame。
+    返回:
+        日均交易次数。
+    """
+    if trades_df is None or trades_df.empty:
+        return 0.0
+    min_time = trades_df["time"].min()
+    max_time = trades_df["time"].max()
+    if pd.isna(min_time) or pd.isna(max_time):
+        return 0.0
+    span_days = max((max_time - min_time).total_seconds() / 86400.0, 1.0)
+    return float(len(trades_df) / span_days)
+
+
+def to_iso_utc(timestamp: pd.Timestamp | None) -> str | None:
+    """
+    将时间戳转换为 UTC ISO 字符串。
+    参数:
+        timestamp: 时间戳。
+    返回:
+        ISO 时间字符串。
+    """
+    if timestamp is None or pd.isna(timestamp):
+        return None
+    ts = timestamp
+    if ts.tz is None:
+        ts = ts.tz_localize(_RESAMPLE_TZ)
+    return ts.tz_convert("UTC").isoformat()
 
 
 # === 价格数据 ===
@@ -815,7 +947,7 @@ def parse_args() -> argparse.Namespace:
         参数命名空间。
     """
     parser = argparse.ArgumentParser(description="vault quantstats 计算工具")
-    parser.add_argument("vault_address", nargs="?", default="0xb1505ad1a4c7755e0eb236aa2f4327bfc3474768", help="vault 地址")
+    parser.add_argument("vault_address", nargs="?", default="", help="可选 vault 地址，空则全量处理")
     parser.add_argument(
         "--no-download-prices",
         action="store_true",
@@ -845,6 +977,7 @@ def main() -> None:
     download_prices = not bool(args.no_download_prices)
     freq = os.getenv("VAULT_QUANTSTAT_FREQ", "D")
     freq = str(freq).strip().upper() or "D"
+    metrics_window = os.getenv("VAULT_QUANTSTAT_WINDOW", "all").strip().lower() or "all"
     out_dir.mkdir(parents=True, exist_ok=True)
     vault_addresses = load_vault_addresses(vaults_csv, "normal")
     create_time_map = load_vault_create_time_map(vaults_csv)
@@ -857,6 +990,7 @@ def main() -> None:
     summary_path = root_dir / "vault_quantstat.csv"
 
     for vault_address in vault_addresses:
+        vault_address = str(vault_address).strip().lower()
         trade_path = trades_dir / f"{vault_address}.csv"
         trades_df = load_trades(trade_path)
         if trades_df.empty:
@@ -867,6 +1001,10 @@ def main() -> None:
         ledger_path = ledger_dir / f"{vault_address}.csv"
         funding_df = load_cashflows(funding_path)
         ledger_df = load_cashflows(ledger_path)
+        ledger_events = load_ledger_events(ledger_path)
+        follower_count, avg_depositor_hold_days = compute_follower_stats(ledger_events)
+        avg_trades_per_day = compute_avg_trades_per_day(trades_df)
+        last_trade_at = to_iso_utc(trades_df["time"].max())
 
         coins = sorted(trades_df["coin"].dropna().unique().tolist())
         create_time = None
@@ -992,6 +1130,14 @@ def main() -> None:
             nav_out.index = nav_out.index.tz_localize(None)
         nav_out.reset_index().to_csv(nav_output, index=False)
 
+        nav_points = []
+        for ts, nav_value in nav_out["nav"].items():
+            if pd.isna(nav_value):
+                continue
+            timestamp = ts.to_pydatetime().isoformat()
+            nav_points.append({"timestamp": timestamp, "nav": float(nav_value)})
+        nav_json = json.dumps(nav_points, ensure_ascii=True)
+
         returns_out = returns.copy()
         if returns_out.index.tz is not None:
             returns_out.index = returns_out.index.tz_localize(None)
@@ -1018,8 +1164,14 @@ def main() -> None:
             "time_in_market": time_in_market,
             "avg_hold_days": avg_hold_days,
             "trader_age_hours": trader_age_hours,
+            "follower_count": follower_count,
+            "avg_depositor_hold_days": avg_depositor_hold_days,
+            "avg_trades_per_day": avg_trades_per_day,
             "freq": freq,
             "metrics_mode": metrics_mode,
+            "metrics_window": metrics_window,
+            "last_trade_at": last_trade_at,
+            "nav_json": nav_json,
         }
         upsert_summary_row(summary_path, summary_row)
 
@@ -1029,6 +1181,7 @@ def main() -> None:
         )
 
     print(f"[info] summary saved to {summary_path}")
+    sync_quantstats_to_db(root_dir)
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ import { getLastTradeCategory } from '../utils/timeago';
 import { getValueColor } from '../utils/colorMode';
 import { formatBalance } from '../utils/formatBalance';
 import { formatTraderAge } from '../utils/formatTraderAge';
+import { formatPercentAbs, formatSignedPercent } from '../utils/formatPercent';
 import { TrendingUp, TrendingDown, ArrowUpDown, ArrowUp, ArrowDown, Info } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 
@@ -19,6 +20,11 @@ interface TraderTableViewProps {
   sortDirection: 'asc' | 'desc';
 }
 
+/**
+ * 交易员表格视图组件。
+ * @param props - 组件入参。
+ * @returns 表格视图 UI。
+ */
 export function TraderTableView({
   traders,
   lang,
@@ -196,15 +202,15 @@ export function TraderTableView({
                       <TrendingDown className={`w-4 h-4 ${getValueColor(trader.annualizedReturn, colorMode)}`} />
                     )}
                     <span className={getValueColor(trader.annualizedReturn, colorMode)}>
-                      {isArrPositive ? '+' : ''}{trader.annualizedReturn.toFixed(1)}%
+                      {formatSignedPercent(trader.annualizedReturn, 1)}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell className="text-white text-center">
-                  {trader.metrics.sharpe.toFixed(2)}
+                  {Number.isFinite(trader.sharpeRatio) ? trader.sharpeRatio.toFixed(2) : '--'}
                 </TableCell>
                 <TableCell className={`${getValueColor(-Math.abs(trader.maxDrawdownPercent), colorMode)} text-center`}>
-                  {trader.maxDrawdownPercent.toFixed(1)}%
+                  {formatPercentAbs(trader.maxDrawdownPercent, 1)}
                 </TableCell>
                 <TableCell className="text-white text-center">
                   {formatBalance(trader.balance)}
@@ -231,13 +237,13 @@ export function TraderTableView({
                   </div>
                 </TableCell>
                 <TableCell className="text-white text-center">
-                  {trader.timeInMarketPercent.toFixed(1)}%
+                  {formatPercentAbs(trader.timeInMarketPercent, 1)}
                 </TableCell>
                 <TableCell className="text-white text-center">
                   {trader.followerCount.toLocaleString()}
                 </TableCell>
                 <TableCell className="text-white text-center">
-                  {trader.winRatePercent.toFixed(1)}%
+                  {formatPercentAbs(trader.winRatePercent, 1)}
                 </TableCell>
                 <TableCell className="text-white text-center">
                   {trader.avgHoldDays.toFixed(1)}
@@ -246,7 +252,7 @@ export function TraderTableView({
                   {trader.avgTradesPerDay.toFixed(1)}
                 </TableCell>
                 <TableCell className="text-white text-sm text-center">
-                  {getLastTradeCategory(trader.lastTradeTimestamp)}
+                  {getLastTradeCategory(trader.lastTradeTimestamp, lang)}
                 </TableCell>
               </TableRow>
             );

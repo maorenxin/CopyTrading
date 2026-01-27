@@ -40,8 +40,8 @@ description: "功能实施任务清单"
 
 **⚠️ 关键**: 在此阶段完成前，不允许进入用户故事开发
 
-- [X] T004 定义 Supabase 数据结构与表设计于 `server/db/schema.sql`
-- [X] T005 实现 Supabase 访问封装于 `server/services/supabase.ts`
+- [X] T004 定义 PostgreSQL 数据结构与表设计于 `server/db/schema.sql`
+- [X] T005 实现 PostgreSQL 访问封装于 `server/db/postgres.ts`
 - [X] T006 实现 vault 数据定时同步任务于 `server/jobs/vault-sync.ts`
 - [X] T007 实现 vault 交易 WebSocket 监听任务于 `server/jobs/vault-stream.ts`
 - [X] T008 搭建 API 服务入口与路由聚合于 `server/api/index.ts` 与 `server/api/router.ts`

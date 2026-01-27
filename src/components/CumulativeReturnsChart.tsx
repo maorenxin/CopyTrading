@@ -1,6 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { PnLDataPoint, ColorMode, Language } from '../types/trader';
 import { getPositiveStrokeColor, getNegativeStrokeColor } from '../utils/colorMode';
+import { formatPercent } from '../utils/formatPercent';
 
 interface CumulativeReturnsChartProps {
   data: PnLDataPoint[];
@@ -20,13 +21,14 @@ export function CumulativeReturnsChart({
   // Calculate cumulative returns as percentage change from initial value
   const initialValue = data[0]?.pnl || 1000;
   const initialBtc = data[0]?.btcPnl || initialValue;
+  const locale = lang === 'en' ? 'en-US' : 'zh-CN';
   
   const formattedData = data.map(d => {
     const returnPct = ((d.pnl - initialValue) / initialValue) * 100;
     const btcReturn = ((d.btcPnl ?? initialBtc) - initialBtc) / initialBtc * 100;
     return {
       timestamp: d.timestamp,
-      date: new Date(d.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      date: new Date(d.timestamp).toLocaleDateString(locale, { month: 'short', day: 'numeric' }),
       return: returnPct,
       btcReturn,
       positiveReturn: returnPct >= 0 ? returnPct : 0,
@@ -66,7 +68,7 @@ export function CumulativeReturnsChart({
           stroke="rgba(255, 255, 255, 0.5)"
           tick={{ fill: 'rgba(255, 255, 255, 0.7)', fontSize: 10 }}
           domain={['auto', 'auto']}
-          tickFormatter={(value) => `${value.toFixed(0)}%`}
+          tickFormatter={(value) => formatPercent(Number(value), 0)}
           width={35}
         />
         <Tooltip
@@ -88,9 +90,9 @@ export function CumulativeReturnsChart({
                 }}
               >
                 <div className="mb-1">{dateLabel}: {label}</div>
-                <div>{returnLabel}: {returnItem.value.toFixed(2)}%</div>
+                <div>{returnLabel}: {formatPercent(returnItem.value, 2)}</div>
                 {showBtcComparison && typeof btcItem?.value === 'number' && (
-                  <div>{btcLabel}: {btcItem.value.toFixed(2)}%</div>
+                  <div>{btcLabel}: {formatPercent(btcItem.value, 2)}</div>
                 )}
               </div>
             );
