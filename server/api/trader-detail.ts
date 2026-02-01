@@ -1,5 +1,6 @@
 import type { RouteDefinition } from './router';
 import { query } from '../db/postgres';
+import { loadLocalVaultTrades } from '../services/local-vault-data';
 
 /**
  * 规范化时间窗口参数。
@@ -85,6 +86,124 @@ function safeParseJson(value: string) {
   } catch {
     return null;
   }
+}
+
+/**
+ * 读取 crypto_data_1h 表字段信息。
+ * @returns 字段映射或 null。
+ */
+async function getCryptoDataColumns(): Promise<{
+  timeColumn: string;
+  timeIsNumeric: boolean;
+  priceColumn: string;
+  symbolColumn?: string;
+} | null> {
+  const { rows } = await query(
+    `select column_name, data_type
+     from information_schema.columns
+     where table_name = 'crypto_data_1h' and table_schema = 'public'`,
+  );
+  if (!rows || rows.length === 0) return null;
+
+  const columnSet = new Map<string, string>();
+  rows.forEach((row: any) => {
+    if (row?.column_name) {
+      columnSet.set(String(row.column_name), String(row.data_type ?? ''));
+    }
+  });
+
+  const pickColumn = (candidates: string[]) => candidates.find((name) => columnSet.has(name));
+
+  const timeColumn = pickColumn(['time', 'timestamp', 'utc_time', 'datetime']) ?? '';
+  const priceColumn = pickColumn(['close', 'price', 'close_price', 'c']) ?? '';
+  if (!timeColumn || !priceColumn) return null;
+
+  const dataType = columnSet.get(timeColumn) ?? '';
+  const timeIsNumeric = ['integer', 'bigint', 'numeric', 'double precision', 'real'].includes(dataType);
+  const symbolColumn = pickColumn(['symbol', 'coin', 'asset']);
+
+  return {
+    timeColumn,
+    timeIsNumeric,
+    priceColumn,
+    symbolColumn: symbolColumn ?? undefined,
+  };
+}
+
+/**
+ * 获取 BTC 小时级别价格序列。
+ * @param from - 起始时间（毫秒）。
+ * @param to - 结束时间（毫秒）。
+ * @returns 价格点数组。
+ */
+async function fetchBtcSeries(from: number, to: number) {
+  const columns = await getCryptoDataColumns();
+  if (!columns) return [] as Array<{ timestamp: number; price: number }>;
+
+  const { timeColumn, timeIsNumeric, priceColumn, symbolColumn } = columns;
+  const whereParts: string[] = [];
+  const params: Array<string | number | Date | string[]> = [];
+
+  if (symbolColumn) {
+    params.push(['btc', 'btcusdt', 'btc-perp', 'btc_usdt', 'btc/usdt']);
+    whereParts.push(`lower(${symbolColumn}) = any($${params.length})`);
+  }
+
+  if (Number.isFinite(from) && Number.isFinite(to)) {
+    if (timeIsNumeric) {
+      params.push(from, to);
+      whereParts.push(`${timeColumn} between $${params.length - 1} and $${params.length}`);
+    } else {
+      params.push(new Date(from), new Date(to));
+      whereParts.push(`${timeColumn} between $${params.length - 1} and $${params.length}`);
+    }
+  }
+
+  const whereSql = whereParts.length ? `where ${whereParts.join(' and ')}` : '';
+  const sql = `select ${timeColumn} as ts, ${priceColumn} as price from crypto_data_1h ${whereSql} order by ${timeColumn} asc`;
+  const { rows } = await query(sql, params);
+
+  return (rows ?? [])
+    .map((row: any) => {
+      const rawTime = row?.ts;
+      const rawPrice = row?.price;
+      const price = Number(rawPrice);
+      let timestamp = timeIsNumeric
+        ? Number(rawTime)
+        : new Date(String(rawTime)).getTime();
+      if (timeIsNumeric && Number.isFinite(timestamp) && timestamp > 0 && timestamp < 1e12) {
+        timestamp *= 1000;
+      }
+      if (!Number.isFinite(timestamp) || !Number.isFinite(price)) return null;
+      return { timestamp, price };
+    })
+    .filter(Boolean) as Array<{ timestamp: number; price: number }>;
+}
+
+/**
+ * 将 BTC 价格对齐到净值时间点。
+ * @param points - 净值点。
+ * @param btcSeries - BTC 价格序列。
+ * @returns 对齐后的净值点。
+ */
+function attachBtcSeries(
+  points: Array<{ timestamp: string; vault_equity: number; btc_equity: number }>,
+  btcSeries: Array<{ timestamp: number; price: number }>,
+) {
+  if (!points.length || !btcSeries.length) return points;
+  const sortedBtc = [...btcSeries].sort((a, b) => a.timestamp - b.timestamp);
+  let idx = 0;
+  return points.map((point) => {
+    const time = new Date(point.timestamp).getTime();
+    while (idx < sortedBtc.length - 1 && sortedBtc[idx + 1].timestamp <= time) {
+      idx += 1;
+    }
+    const matched = sortedBtc[idx];
+    return {
+      ...point,
+      btc_equity: Number.isFinite(matched?.price) ? matched.price : point.btc_equity,
+    };
+  });
 }
 
 /**
@@ -229,7 +348,11 @@ async function handleTraderTrades(request: unknown) {
 
   // 查询成交记录
   const rows = await getTraderTrades(traderId, limit);
-  return { items: rows };
+  if (rows.length > 0) {
+    return { items: rows };
+  }
+  const localRows = await loadLocalVaultTrades(String(traderId ?? ''), limit);
+  return { items: localRows };
 }
 
 /**
@@ -250,7 +373,21 @@ async function handleTraderEquity(request: unknown) {
   );
   const navJson = rows?.[0]?.nav_json ?? null;
   const points = filterPointsByWindow(buildNavSeries(navJson), window);
-  return { window, points };
+  if (points.length === 0) {
+    return { window, points };
+  }
+
+  const timestamps = points
+    .map((point) => new Date(point.timestamp).getTime())
+    .filter((value) => Number.isFinite(value));
+  if (timestamps.length === 0) {
+    return { window, points };
+  }
+  const from = Math.min(...timestamps);
+  const to = Math.max(...timestamps);
+  const btcSeries = await fetchBtcSeries(from, to);
+  const merged = attachBtcSeries(points, btcSeries);
+  return { window, points: merged };
 }
 
 export const traderDetailRoutes: RouteDefinition[] = [

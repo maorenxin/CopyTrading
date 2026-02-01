@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { ColorMode, Language, PortfolioPosition, PortfolioSummary, PnLDataPoint } from '../types/trader';
 import { t } from '../utils/translations';
 import { PortfolioOverview } from './PortfolioOverview';
+import { formatWalletAddress } from '../utils/formatWalletAddress';
 
 interface PortfolioDialogProps {
   lang: Language;
@@ -11,7 +12,8 @@ interface PortfolioDialogProps {
   summary: PortfolioSummary;
   series: PnLDataPoint[];
   positions: PortfolioPosition[];
-  onCopyTrade: (trader: PortfolioPosition['trader']) => void;
+  walletAddress?: string;
+  onCloseCopy?: (positionId: string) => void;
 }
 
 /**
@@ -25,18 +27,20 @@ export function PortfolioDialog({
   summary,
   series,
   positions,
-  onCopyTrade,
+  walletAddress,
+  onCloseCopy,
 }: PortfolioDialogProps) {
   const [open, setOpen] = useState(false);
+  const labelAddress = walletAddress ? ` (${formatWalletAddress(walletAddress)})` : '';
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          className="bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20"
+          className="h-10 bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20 hover:text-white cursor-pointer"
         >
-          {t('myPortfolio', lang)}
+          {t('myPortfolio', lang)}{labelAddress}
         </Button>
       </DialogTrigger>
       <DialogContent
@@ -50,8 +54,8 @@ export function PortfolioDialog({
           <DialogTitle className="text-white">{t('myPortfolio', lang)}</DialogTitle>
           <DialogDescription className="text-white/60">
             {lang === 'en'
-              ? 'Review your portfolio, then tap a copy button to place a trade. Close anytime with the top-right icon or below.'
-              : '查看组合概览，点击列表里的跟单即可下单，右上角或下方按钮可退出。'}
+              ? 'Review your portfolio and close copies when needed. Close anytime with the top-right icon or below.'
+              : '查看组合概览，需要时可在列表清仓，右上角或下方按钮可退出。'}
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4">
@@ -61,7 +65,7 @@ export function PortfolioDialog({
             summary={summary}
             series={series}
             positions={positions}
-            onCopyTrade={onCopyTrade}
+            onCloseCopy={onCloseCopy}
             layout="desktop"
           />
         </div>

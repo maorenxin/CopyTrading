@@ -3,17 +3,20 @@ import { Button } from './ui/button';
 import { Wallet } from 'lucide-react';
 import { Language } from '../types/trader';
 import { t } from '../utils/translations';
-import { formatWalletAddress } from '../utils/formatWalletAddress';
 import {
   getAccounts,
   getInjectedProvider,
   requestAccounts,
+  requestWalletSignature,
   subscribeAccountsChanged,
 } from '../utils/wallet';
 import type { WalletStatus, WalletProviderInfo } from '../types/wallet';
 
+const REAUTH_FLAG_KEY = 'wallet_force_reauth';
+
 interface WalletConnectProps {
   lang: Language;
+  onAddressChange?: (address: string) => void;
 }
 
 /**
@@ -21,11 +24,23 @@ interface WalletConnectProps {
  * @param props - 钱包组件参数。
  * @returns WalletConnect 组件。
  */
-export function WalletConnect({ lang }: WalletConnectProps) {
+export function WalletConnect({ lang, onAddressChange }: WalletConnectProps) {
   const [status, setStatus] = useState<WalletStatus>('disconnected');
   const [address, setAddress] = useState('');
   const [error, setError] = useState('');
   const [providerInfo, setProviderInfo] = useState<WalletProviderInfo | null>(null);
+
+  /**
+   * 判断是否需要重新授权。
+   * @returns 是否需要重新授权。
+   */
+  const needsReauth = () => localStorage.getItem(REAUTH_FLAG_KEY) === '1';
+
+  /**
+   * 生成钱包重新授权签名的提示文案。
+   * @returns 签名文案。
+   */
+  const buildReauthMessage = () => `CopyTrading login confirmation\nTime: ${new Date().toISOString()}`;
 
   useEffect(() => {
     const info = getInjectedProvider();
@@ -41,17 +56,27 @@ export function WalletConnect({ lang }: WalletConnectProps) {
       const cachedAddress = localStorage.getItem('wallet_address') ?? '';
       try {
         const accounts = await getAccounts(info.provider);
+        if (needsReauth()) {
+          setAddress('');
+          setStatus('disconnected');
+          localStorage.removeItem('wallet_address');
+          onAddressChange?.('');
+          return;
+        }
         if (accounts[0]) {
           setAddress(accounts[0]);
           setStatus('connected');
           localStorage.setItem('wallet_address', accounts[0]);
+          onAddressChange?.(accounts[0]);
         } else if (cachedAddress) {
           setAddress(cachedAddress);
           setStatus('connected');
+          onAddressChange?.(cachedAddress);
         } else {
           setAddress('');
           setStatus('disconnected');
           localStorage.removeItem('wallet_address');
+          onAddressChange?.('');
         }
       } catch {
         setStatus('error');
@@ -60,14 +85,24 @@ export function WalletConnect({ lang }: WalletConnectProps) {
 
     syncAccounts();
     cleanup = subscribeAccountsChanged(info.provider, (accounts) => {
+      if (needsReauth()) {
+        setAddress('');
+        setStatus('disconnected');
+        localStorage.removeItem('wallet_address');
+        onAddressChange?.('');
+        return;
+      }
       if (accounts[0]) {
         setAddress(accounts[0]);
         setStatus('connected');
         localStorage.setItem('wallet_address', accounts[0]);
+        onAddressChange?.(accounts[0]);
       } else {
         setAddress('');
         setStatus('disconnected');
+        localStorage.setItem(REAUTH_FLAG_KEY, '1');
         localStorage.removeItem('wallet_address');
+        onAddressChange?.('');
       }
     });
 
@@ -86,11 +121,29 @@ export function WalletConnect({ lang }: WalletConnectProps) {
     try {
       const accounts = await requestAccounts(providerInfo.provider);
       if (accounts[0]) {
+        if (needsReauth()) {
+          const signature = await requestWalletSignature(
+            providerInfo.provider,
+            accounts[0],
+            buildReauthMessage(),
+          );
+          if (!signature) {
+            setStatus('error');
+            setError(t('connectFailed', lang));
+            setAddress('');
+            localStorage.removeItem('wallet_address');
+            onAddressChange?.('');
+            return;
+          }
+          localStorage.removeItem(REAUTH_FLAG_KEY);
+        }
         setAddress(accounts[0]);
         setStatus('connected');
         localStorage.setItem('wallet_address', accounts[0]);
+        onAddressChange?.(accounts[0]);
       } else {
         setStatus('disconnected');
+        onAddressChange?.('');
       }
     } catch {
       setError(t('connectFailed', lang));
@@ -101,24 +154,21 @@ export function WalletConnect({ lang }: WalletConnectProps) {
   const disconnectWallet = () => {
     setAddress('');
     setStatus('disconnected');
+    localStorage.setItem(REAUTH_FLAG_KEY, '1');
     localStorage.removeItem('wallet_address');
+    onAddressChange?.('');
   };
 
   if (status === 'connected') {
     return (
-      <div className="flex items-center gap-2">
-        <div className="px-4 h-10 flex items-center bg-white/10 backdrop-blur-md border border-white/20 rounded-lg text-white text-sm">
-          {formatWalletAddress(address)}
-        </div>
-        <Button
-          onClick={disconnectWallet}
-          variant="outline"
-          className="h-10 bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20"
-          style={{ backdropFilter: 'blur(10px)' }}
-        >
-          {t('disconnect', lang)}
-        </Button>
-      </div>
+      <Button
+        onClick={disconnectWallet}
+        variant="outline"
+        className="h-10 bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20 cursor-pointer"
+        style={{ backdropFilter: 'blur(10px)' }}
+      >
+        {t('disconnect', lang)}
+      </Button>
     );
   }
 

@@ -9,6 +9,7 @@ import {
   listVaultTrades,
   listVaults,
 } from "../services/vault-repository";
+import { loadLocalVaultPositions } from "../services/local-vault-data";
 
 export const vaultRoutes: RouteDefinition[] = [
   {
@@ -76,7 +77,11 @@ export const vaultRoutes: RouteDefinition[] = [
       const params = (request as any)?.params ?? {};
       const vaultAddress = String(params.vaultAddress ?? "").toLowerCase();
       const items = await listVaultPositions(vaultAddress);
-      return { items };
+      if (items.length > 0) {
+        return { items };
+      }
+      const localItems = await loadLocalVaultPositions(vaultAddress);
+      return { items: localItems };
     },
   },
   {

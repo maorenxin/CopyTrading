@@ -82,6 +82,35 @@ function buildPnlDataFromNavJson(navJson: unknown) {
 }
 
 /**
+ * 使用 nav 起止值构建简化曲线。
+ * @param navStart - 起始净值。
+ * @param navEnd - 结束净值。
+ * @param createdAt - 创建时间毫秒。
+ * @param lastTradeAt - 最新交易时间。
+ * @returns 简化曲线点。
+ */
+function buildFallbackPnlSeries(
+  navStart?: number,
+  navEnd?: number,
+  createdAt?: number,
+  lastTradeAt?: string,
+) {
+  const startValue = Number.isFinite(navStart) ? navStart : navEnd ?? 0;
+  const endValue = Number.isFinite(navEnd) ? navEnd : startValue;
+  const startTime = createdAt
+    ? Number(createdAt)
+    : lastTradeAt
+      ? new Date(lastTradeAt).getTime() - 7 * 24 * 60 * 60 * 1000
+      : Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const endTime = lastTradeAt ? new Date(lastTradeAt).getTime() : Date.now();
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return [];
+  return [
+    { timestamp: startTime, pnl: Number(startValue) },
+    { timestamp: endTime, pnl: Number(endValue) },
+  ];
+}
+
+/**
  * 安全解析 JSON 字符串。
  * @param value - JSON 字符串。
  * @returns 解析结果或 null。
@@ -201,12 +230,20 @@ function buildTraderItems(rows: Array<Record<string, any>>) {
           metrics.balance,
         ]);
 
+    const navSeries = buildPnlDataFromNavJson(row.nav_json);
+    const fallbackSeries = buildFallbackPnlSeries(
+      navStart,
+      navEnd,
+      toNumber(row.create_time_millis, 0),
+      row.last_trade_at,
+    );
+
     return {
       id: row.vault_address,
       address: row.vault_address,
       rank: toNumber(row.rank, 0),
       metrics,
-      pnlData: buildPnlDataFromNavJson(row.nav_json),
+      pnlData: navSeries.length ? navSeries : fallbackSeries,
       aiStrategy: {
         en: '',
         cn: '',
@@ -268,6 +305,7 @@ async function handleTraders(request: unknown) {
         radar_area,
         nav_start,
         nav_end,
+        create_time_millis,
         last_trade_at,
         row_number() over (order by annualized_return desc nulls last, vault_address asc) as rank
      from vault_info

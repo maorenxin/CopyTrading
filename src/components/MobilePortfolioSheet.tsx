@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { ColorMode, Language, PortfolioPosition, PortfolioSummary, PnLDataPoint } from '../types/trader';
 import { t } from '../utils/translations';
 import { PortfolioOverview } from './PortfolioOverview';
+import { formatWalletAddress } from '../utils/formatWalletAddress';
 
 interface MobilePortfolioSheetProps {
   lang: Language;
@@ -10,7 +11,8 @@ interface MobilePortfolioSheetProps {
   summary: PortfolioSummary;
   series: PnLDataPoint[];
   positions: PortfolioPosition[];
-  onCopyTrade: (trader: PortfolioPosition['trader']) => void;
+  onCloseCopy?: (positionId: string) => void;
+  walletAddress?: string;
 }
 
 /**
@@ -24,16 +26,18 @@ export function MobilePortfolioSheet({
   summary,
   series,
   positions,
-  onCopyTrade,
+  onCloseCopy,
+  walletAddress,
 }: MobilePortfolioSheetProps) {
+  const labelAddress = walletAddress ? ` (${formatWalletAddress(walletAddress)})` : '';
   return (
     <Sheet>
       <SheetTrigger asChild>
         <Button
           variant="outline"
-          className="bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20"
+          className="h-10 bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20 hover:text-white cursor-pointer"
         >
-          {t('myPortfolio', lang)}
+          {t('myPortfolio', lang)}{labelAddress}
         </Button>
       </SheetTrigger>
       <SheetContent 
@@ -46,7 +50,7 @@ export function MobilePortfolioSheet({
       >
         <SheetHeader>
           <SheetTitle className="text-white">
-            {t('myPortfolio', lang)}
+            {t('myPortfolio', lang)}{labelAddress}
           </SheetTitle>
         </SheetHeader>
 
@@ -57,7 +61,7 @@ export function MobilePortfolioSheet({
             summary={summary}
             series={series}
             positions={positions}
-            onCopyTrade={onCopyTrade}
+            onCloseCopy={onCloseCopy}
             layout="mobile"
           />
         </div>

@@ -171,26 +171,29 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
    * 复制交易者地址到剪贴板。
    * @returns void
    */
-  const handleCopyAddress = () => {
+  const handleCopyAddress = async () => {
     if (!trader) return;
-    const textArea = document.createElement('textarea');
-    textArea.value = trader.address;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    textArea.style.top = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-
+    const address = trader.address;
     try {
-      document.execCommand('copy');
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(address);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = address;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setShowCopied(true);
       setTimeout(() => setShowCopied(false), 800);
     } catch {
       // ignore
     }
-
-    document.body.removeChild(textArea);
   };
 
   const pageSize = 10;
@@ -242,7 +245,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                     <button
                       type="button"
                       onClick={handleCopyAddress}
-                      className="text-white font-mono text-sm hover:text-white/80"
+                      className="text-white font-mono text-sm hover:text-white/80 cursor-pointer"
                     >
                       {trader.address}
                     </button>
@@ -337,16 +340,16 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                 }
               }}
             >
-              <TabsList className="bg-white/10 border border-white/20 mb-4">
+              <TabsList className="bg-white/5 border border-white/15 mb-4">
                 <TabsTrigger
                   value="trades"
-                  className="text-white/70 border border-transparent data-[state=active]:text-white data-[state=active]:bg-white/20 data-[state=active]:border-white/40 data-[state=active]:shadow-[0_0_18px_rgba(255,255,255,0.15)]"
+                  className="text-white/60 border border-transparent data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500/30 data-[state=active]:to-purple-500/30 data-[state=active]:border-blue-300/50 data-[state=active]:shadow-[0_0_20px_rgba(59,130,246,0.25)]"
                 >
                   {lang === 'en' ? 'Trades' : '交易记录'}
                 </TabsTrigger>
                 <TabsTrigger
                   value="positions"
-                  className="text-white/70 border border-transparent data-[state=active]:text-white data-[state=active]:bg-white/20 data-[state=active]:border-white/40 data-[state=active]:shadow-[0_0_18px_rgba(255,255,255,0.15)]"
+                  className="text-white/60 border border-transparent data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500/30 data-[state=active]:to-purple-500/30 data-[state=active]:border-blue-300/50 data-[state=active]:shadow-[0_0_20px_rgba(59,130,246,0.25)]"
                 >
                   {lang === 'en' ? 'Latest Positions' : '最新仓位'}
                 </TabsTrigger>
@@ -354,128 +357,142 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
 
               <TabsContent value="trades">
                 <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/20">
-                        <TableHead className="text-white/70">{t('date', lang)}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Symbol' : '币种'}</TableHead>
-                        <TableHead className="text-white/70">{t('type', lang)}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Price' : '价格'}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Quantity' : '数量'}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Notional' : '成交价值'}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pagedTrades.map((trade) => {
-                        const price = trade.price ?? trade.entry;
-                        const quantity = trade.size ?? 0;
-                        const notional = price * quantity;
-                        return (
-                          <TableRow key={trade.id} className="border-white/20">
-                            <TableCell className="text-white text-sm">
-                              {new Date(trade.timestamp).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN')}
-                            </TableCell>
-                            <TableCell className="text-white text-sm">
-                              {trade.symbol ?? 'BTC'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={
-                                  trade.type === 'long'
-                                    ? 'bg-green-500/20 text-green-300 border-green-400/30'
-                                    : 'bg-red-500/20 text-red-300 border-red-400/30'
-                                }
-                              >
-                                {trade.type === 'long' ? t('long', lang) : t('short', lang)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-white text-sm">
-                              ${price.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-white text-sm">
-                              {quantity.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-white text-sm">
-                              ${notional.toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                  {pagedTrades.length === 0 ? (
+                    <div className="text-white/60 text-sm py-6 text-center">
+                      {lang === 'en' ? 'No trade records yet' : '暂无交易记录'}
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-white/20">
+                          <TableHead className="text-white/70">{t('date', lang)}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Symbol' : '币种'}</TableHead>
+                          <TableHead className="text-white/70">{t('type', lang)}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Price' : '价格'}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Quantity' : '数量'}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Notional' : '成交价值'}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pagedTrades.map((trade) => {
+                          const price = trade.price ?? trade.entry;
+                          const quantity = trade.size ?? 0;
+                          const notional = price * quantity;
+                          return (
+                            <TableRow key={trade.id} className="border-white/20">
+                              <TableCell className="text-white text-sm">
+                                {new Date(trade.timestamp).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN')}
+                              </TableCell>
+                              <TableCell className="text-white text-sm">
+                                {trade.symbol ?? 'BTC'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={
+                                    trade.type === 'long'
+                                      ? 'bg-green-500/20 text-green-300 border-green-400/30'
+                                      : 'bg-red-500/20 text-red-300 border-red-400/30'
+                                  }
+                                >
+                                  {trade.type === 'long' ? t('long', lang) : t('short', lang)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-white text-sm">
+                                ${price.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-white text-sm">
+                                {quantity.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-white text-sm">
+                                ${notional.toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
-                <div className="flex items-center justify-between mt-3">
-                  <Button
-                    variant="outline"
-                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                    disabled={tradePage <= 1}
-                    onClick={() => setTradePage((prev) => Math.max(1, prev - 1))}
-                  >
-                    {lang === 'en' ? 'Prev' : '上一页'}
-                  </Button>
-                  <span className="text-white/60 text-sm">
-                    {tradePage} / {tradePages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                    disabled={tradePage >= tradePages}
-                    onClick={() => setTradePage((prev) => Math.min(tradePages, prev + 1))}
-                  >
-                    {lang === 'en' ? 'Next' : '下一页'}
-                  </Button>
-                </div>
+                {pagedTrades.length > 0 && (
+                  <div className="flex items-center justify-between mt-3">
+                    <Button
+                      variant="outline"
+                      className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      disabled={tradePage <= 1}
+                      onClick={() => setTradePage((prev) => Math.max(1, prev - 1))}
+                    >
+                      {lang === 'en' ? 'Prev' : '上一页'}
+                    </Button>
+                    <span className="text-white/60 text-sm">
+                      {tradePage} / {tradePages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      disabled={tradePage >= tradePages}
+                      onClick={() => setTradePage((prev) => Math.min(tradePages, prev + 1))}
+                    >
+                      {lang === 'en' ? 'Next' : '下一页'}
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="positions">
                 <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/20">
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Symbol' : '币种'}</TableHead>
-                        <TableHead className="text-white/70">{t('type', lang)}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Quantity' : '数量'}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Position Value' : '仓位价值'}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Entry Price' : '开仓价格'}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'Mark Price' : '标记价格'}</TableHead>
-                        <TableHead className="text-white/70">{lang === 'en' ? 'PnL (ROE%)' : '盈亏(ROE%)'}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pagedPositions.map((position) => {
-                        const pnlText = `${position.pnl >= 0 ? '+' : ''}${position.pnl.toFixed(2)} (${position.roe.toFixed(1)}%)`;
-                        return (
-                          <TableRow key={position.id} className="border-white/20">
-                            <TableCell className="text-white text-sm">{position.symbol}</TableCell>
-                            <TableCell>
-                              <Badge
-                                className={
-                                  position.type === 'long'
-                                    ? 'bg-green-500/20 text-green-300 border-green-400/30'
-                                    : 'bg-red-500/20 text-red-300 border-red-400/30'
-                                }
-                              >
-                                {position.type === 'long' ? t('long', lang) : t('short', lang)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-white text-sm">{position.quantity.toLocaleString()}</TableCell>
-                            <TableCell className="text-white text-sm">
-                              ${position.positionValue.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-white text-sm">
-                              ${position.entryPrice.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-white text-sm">
-                              ${position.markPrice.toLocaleString()}
-                            </TableCell>
-                            <TableCell className={getValueColor(position.pnl, colorMode)}>
-                              {pnlText}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                  {pagedPositions.length === 0 ? (
+                    <div className="text-white/60 text-sm py-6 text-center">
+                      {lang === 'en' ? 'No position data yet' : '暂无仓位数据'}
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-white/20">
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Symbol' : '币种'}</TableHead>
+                          <TableHead className="text-white/70">{t('type', lang)}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Quantity' : '数量'}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Position Value' : '仓位价值'}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Entry Price' : '开仓价格'}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'Mark Price' : '标记价格'}</TableHead>
+                          <TableHead className="text-white/70">{lang === 'en' ? 'PnL (ROE%)' : '盈亏(ROE%)'}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pagedPositions.map((position) => {
+                          const pnlText = `${position.pnl >= 0 ? '+' : ''}${position.pnl.toFixed(2)} (${position.roe.toFixed(1)}%)`;
+                          return (
+                            <TableRow key={position.id} className="border-white/20">
+                              <TableCell className="text-white text-sm">{position.symbol}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={
+                                    position.type === 'long'
+                                      ? 'bg-green-500/20 text-green-300 border-green-400/30'
+                                      : 'bg-red-500/20 text-red-300 border-red-400/30'
+                                  }
+                                >
+                                  {position.type === 'long' ? t('long', lang) : t('short', lang)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-white text-sm">{position.quantity.toLocaleString()}</TableCell>
+                              <TableCell className="text-white text-sm">
+                                ${position.positionValue.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-white text-sm">
+                                ${position.entryPrice.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-white text-sm">
+                                ${position.markPrice.toLocaleString()}
+                              </TableCell>
+                              <TableCell className={getValueColor(position.pnl, colorMode)}>
+                                {pnlText}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <Button

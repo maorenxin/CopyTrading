@@ -825,7 +825,67 @@ export async function listVaultPositions(vaultAddress: string) {
     "select * from vault_positions where vault_address = $1",
     [vaultAddress]
   );
-  return rows ?? [];
+  if (rows && rows.length > 0) return rows;
+
+  const { rows: tradeRows } = await query(
+    `select coin, side, price, size, start_position, end_position, utc_time, timestamp
+     from vault_trades
+     where vault_address = $1
+     order by coalesce(utc_time, timestamp) desc nulls last`,
+    [vaultAddress]
+  );
+  if (!tradeRows || tradeRows.length === 0) return [];
+
+  const latestByCoin = new Map<string, any>();
+  tradeRows.forEach((trade) => {
+    const coin = String(trade.coin ?? '').toUpperCase();
+    if (!coin || latestByCoin.has(coin)) return;
+    latestByCoin.set(coin, trade);
+  });
+
+  const positions = Array.from(latestByCoin.values())
+    .map((trade) => {
+      const sideRaw = String(trade.side ?? '').toLowerCase();
+      const direction = sideRaw.includes('short') || sideRaw === 's' || sideRaw === 'sell' ? -1 : 1;
+      const size = Number(trade.size ?? 0) || 0;
+      const startPosition = Number(trade.start_position ?? 0) || 0;
+      const price = Number(trade.price ?? 0) || 0;
+      const computedEnd = startPosition + direction * size;
+      const endPosition =
+        typeof trade.end_position === 'number' || typeof trade.end_position === 'string'
+          ? Number(trade.end_position)
+          : computedEnd;
+      if (!Number.isFinite(endPosition) || endPosition === 0) {
+        if (!size) return null;
+        const fallbackQty = Math.abs(size);
+        return {
+          vault_address: vaultAddress,
+          symbol: String(trade.coin ?? '').toUpperCase(),
+          side: direction < 0 ? 'short' : 'long',
+          leverage: null,
+          quantity: fallbackQty,
+          entry_price: price,
+          mark_price: price,
+          position_value: price * fallbackQty,
+          roe_percent: 0,
+        };
+      }
+      const quantity = Math.abs(endPosition);
+      return {
+        vault_address: vaultAddress,
+        symbol: String(trade.coin ?? '').toUpperCase(),
+        side: endPosition < 0 ? 'short' : 'long',
+        leverage: null,
+        quantity,
+        entry_price: price,
+        mark_price: price,
+        position_value: price * quantity,
+        roe_percent: 0,
+      };
+    })
+    .filter(Boolean);
+
+  return positions as any[];
 }
 
 export async function listVaultDepositors(vaultAddress: string) {

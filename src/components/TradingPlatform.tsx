@@ -30,9 +30,10 @@ export function TradingPlatform() {
   const [isLoading, setIsLoading] = useState(false);
   const loadingRef = useRef<HTMLDivElement>(null);
   const [portfolioPositions, setPortfolioPositions] = useState<PortfolioPosition[]>([]);
+  const [walletAddress, setWalletAddress] = useState('');
 
   // Table sorting state
-  const [tableSortColumn, setTableSortColumn] = useState<string | null>('annualizedReturn');
+  const [tableSortColumn, setTableSortColumn] = useState<string | null>('radarChart');
   const [tableSortDirection, setTableSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Handle table column sort
@@ -210,6 +211,13 @@ export function TradingPlatform() {
     setDisplayCount(8);
   }, [sortBy]);
 
+  useEffect(() => {
+    const cached = localStorage.getItem('wallet_address') ?? '';
+    if (cached) {
+      setWalletAddress(cached);
+    }
+  }, []);
+
   // Reset displayCount when viewMode changes or table sort changes
   useEffect(() => {
     setDisplayCount(8);
@@ -243,6 +251,14 @@ export function TradingPlatform() {
     });
   };
 
+  /**
+   * 清理跟单仓位。
+   * @param positionId - 跟单记录 ID。
+   */
+  const handleCloseCopyTrade = (positionId: string) => {
+    setPortfolioPositions((prev) => prev.filter((position) => position.id !== positionId));
+  };
+
   const portfolioSummary = useMemo(
     () => buildPortfolioSummary(portfolioPositions),
     [portfolioPositions],
@@ -263,16 +279,18 @@ export function TradingPlatform() {
         portfolioSummary={portfolioSummary}
         portfolioSeries={portfolioSeries}
         portfolioPositions={portfolioPositions}
-        onCopyTrade={handleCopyTrade}
+        onCloseCopy={handleCloseCopyTrade}
+        walletAddress={walletAddress}
+        onWalletAddressChange={setWalletAddress}
       />
 
       <div className="min-h-screen text-white p-4 md:p-6">
         <div className="max-w-[1800px] mx-auto">
           {/* Controls */}
           <div className="mb-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-center justify-between gap-3 flex-nowrap">
               {/* View Mode Toggle */}
-              <div className="flex gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-1">
+              <div className="flex gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-1 shrink-0">
                 <Button
                   onClick={() => setViewMode('card')}
                   variant="ghost"
@@ -301,10 +319,10 @@ export function TradingPlatform() {
 
               {/* Sort Control - Only show in Card View */}
               {viewMode === 'card' && (
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 ml-auto shrink-0">
                   <span className="text-white/70 text-sm whitespace-nowrap">{t('sortBy', lang)}:</span>
                   <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value as SortOption)}>
-                    <SelectTrigger className="w-full sm:w-[200px] bg-white/10 backdrop-blur-md border-white/20 text-white">
+                    <SelectTrigger className="w-[160px] bg-white/10 backdrop-blur-md border-white/20 text-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#1A0B2E] border-white/20 text-white">

@@ -22,13 +22,13 @@ export function ColorModeSwitcher({ currentMode, onColorModeChange }: ColorModeS
       variant="outline"
       size="sm"
       onClick={toggleColorMode}
-      className="border-white/20 bg-white/5 hover:bg-white/10 transition-colors text-[rgb(255,255,255)] flex items-center justify-center h-10"
+      className="border-white/20 bg-white/5 hover:bg-white/10 transition-colors text-[rgb(255,255,255)] flex items-center justify-center h-10 px-3"
       title={currentMode === 'standard' ? 'Up=Green, Down=Red' : 'Up=Red, Down=Green'}
     >
-      <span className="hidden sm:inline text-xs">
-        <span className="flex items-center gap-1">
-          <span className={upColor}>↑</span><span className="text-white">/</span><span className={downColor}>↓</span>
-        </span>
+      <span className="text-xs flex items-center gap-1">
+        <span className={upColor}>↑</span>
+        <span className="text-white">/</span>
+        <span className={downColor}>↓</span>
       </span>
     </Button>
   );

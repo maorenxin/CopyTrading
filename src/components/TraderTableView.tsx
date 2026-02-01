@@ -59,7 +59,15 @@ export function TraderTableView({
       <Table>
         <TableHeader>
           <TableRow className="border-white/20 hover:bg-white/5">
-            <TableHead className="text-white/70 text-center text-base">Rank</TableHead>
+            <TableHead
+              className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"
+              onClick={(e) => handleHeaderClick('radarChart', e)}
+            >
+              <div className="flex items-center justify-center gap-1">
+                <span>Rank</span>
+                {renderSortIcon('radarChart')}
+              </div>
+            </TableHead>
             <TableHead className="text-white/70 text-center text-base">{t('traderAddress', lang)}</TableHead>
             <TableHead
               className="text-white/70 text-center cursor-pointer hover:text-white transition-colors text-base"

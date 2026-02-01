@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -9,7 +9,13 @@ import { formatTraderAge } from '../utils/formatTraderAge';
 import { DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatSignedPercent } from '../utils/formatPercent';
-import { getInjectedProvider, requestAccounts, requestWalletSignature } from '../utils/wallet';
+import {
+  fetchUsdcBalance,
+  getInjectedProvider,
+  getPrimaryAccount,
+  requestAccounts,
+  requestWalletSignature,
+} from '../utils/wallet';
 
 interface CopyTradeModalProps {
   trader: Trader | null;
@@ -29,13 +35,95 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }:
   const [customAmount, setCustomAmount] = useState('100');
   const [copyInstantly, setCopyInstantly] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const maxBalance = Math.max(0, trader?.balance ?? 0);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [balanceLoading, setBalanceLoading] = useState(false);
+
+  const maxBalance = useMemo(() => {
+    if (walletBalance === null || !Number.isFinite(walletBalance)) return 0;
+    return Math.max(0, walletBalance);
+  }, [walletBalance]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsSubmitting(false);
+      return;
+    }
+    setCopyInstantly(true);
+
+    let active = true;
+
+    const loadBalance = async () => {
+      const providerInfo = getInjectedProvider();
+      if (!providerInfo) {
+        if (active) {
+          setWalletAddress('');
+          setWalletBalance(null);
+          setBalanceLoading(false);
+        }
+        return;
+      }
+
+      setBalanceLoading(true);
+      try {
+        const account = await getPrimaryAccount(providerInfo.provider);
+        if (!active) return;
+        setWalletAddress(account);
+        if (!account) {
+          setWalletBalance(null);
+          setBalanceLoading(false);
+          return;
+        }
+        const balance = await fetchUsdcBalance(providerInfo.provider, account);
+        if (!active) return;
+        setWalletBalance(balance);
+      } finally {
+        if (active) setBalanceLoading(false);
+      }
+    };
+
+    loadBalance();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (walletBalance === null || !Number.isFinite(walletBalance)) return;
+    if (walletBalance > 0 && amount > walletBalance) {
+      setAmount(walletBalance);
+      setCustomAmount(walletBalance.toString());
+    }
+  }, [walletBalance, amount]);
 
   if (!trader) return null;
 
   const presetAmounts = [100, 500, 1000];
   const returnColor = trader.allTimeReturn >= 0 ? 'text-green-400' : 'text-red-400';
   const ReturnIcon = trader.allTimeReturn >= 0 ? TrendingUp : TrendingDown;
+
+  /**
+   * 为异步流程加上超时保护。
+   * @param promise - 原始 Promise。
+   * @param ms - 超时时间毫秒。
+   * @returns Promise 结果或 null。
+   */
+  const withTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T | null> => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      return await new Promise<T | null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+        promise
+          .then((value) => resolve(value))
+          .catch(() => resolve(null));
+      });
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
+  };
 
   /**
    * 拉起钱包完成交互签名。
@@ -53,10 +141,16 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }:
       toast.error(lang === 'en' ? 'Wallet connection failed' : '钱包连接失败');
       return false;
     }
+    const modeLabel = copyInstantly
+      ? (lang === 'en' ? 'Instant market copy' : '立刻市价复制仓位')
+      : (lang === 'en' ? 'Follow future trades only' : '仅跟随后续交易');
     const message = lang === 'en'
-      ? `Confirm copy trade for ${trader.address} with $${amount} USDC.`
-      : `确认跟单 ${trader.address}，金额 $${amount} USDC。`;
-    const signature = await requestWalletSignature(providerInfo.provider, account, message);
+      ? `Confirm copy trade for ${trader.address} with $${amount} USDC.\nMode: ${modeLabel}`
+      : `确认跟单 ${trader.address}，金额 $${amount} USDC。\n模式：${modeLabel}`;
+    const signature = await withTimeout(
+      requestWalletSignature(providerInfo.provider, account, message),
+      12000,
+    );
     if (!signature) {
       toast.error(lang === 'en' ? 'Wallet signature canceled' : '已取消钱包签名');
       return false;
@@ -76,15 +170,17 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }:
       if (!ok) return;
       toast.success(
         lang === 'en'
-          ? `Trade submitted with $${amount} USDC`
-          : `已提交 $${amount} USDC 跟单`,
+          ? `Copy plan created for $${amount} USDC`
+          : `已创建 $${amount} USDC 跟单计划`,
         {
           description: lang === 'en'
-            ? `Following trader ${trader.address.substring(0, 8)}...`
-            : `跟随交易者 ${trader.address.substring(0, 8)}...`,
+            ? `Mode: ${copyInstantly ? 'Instant market copy' : 'Follow future trades only'}`
+            : `模式：${copyInstantly ? '立刻市价复制仓位' : '仅跟随后续交易'}`,
         },
       );
-      onConfirmCopy?.(trader, amount);
+      if (copyInstantly) {
+        onConfirmCopy?.(trader, amount);
+      }
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -108,6 +204,25 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }:
       setAmount(numValue);
     }
   };
+
+  /**
+   * 切换立即复制仓位选项。
+   */
+  const toggleCopyInstantly = () => {
+    setCopyInstantly((prev) => !prev);
+  };
+
+  const availableBalanceLabel = balanceLoading
+    ? lang === 'en'
+      ? 'Loading wallet balance...'
+      : '正在读取钱包余额...'
+    : walletAddress
+      ? lang === 'en'
+        ? `Available balance: $${maxBalance.toLocaleString()} USDC`
+        : `可用余额: $${maxBalance.toLocaleString()} USDC`
+      : lang === 'en'
+        ? 'Connect wallet to view USDC balance'
+        : '连接钱包后显示 USDC 余额';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -183,6 +298,7 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }:
                     ? 'bg-blue-500 border-blue-400 text-white hover:bg-blue-600'
                     : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
                 }`}
+                disabled={maxBalance <= 0}
               >
                 {t('maxBalance', lang)}
               </Button>
@@ -200,25 +316,36 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }:
                 className="pl-10 bg-white/10 border-white/20 text-white placeholder-white/50"
                 placeholder={t('selectAmount', lang)}
                 min="1"
-                max={maxBalance}
+                max={maxBalance > 0 ? maxBalance : undefined}
               />
             </div>
             
-            <p className="text-white/50 text-xs mt-2">
-              {lang === 'en' 
-                ? `Available balance: $${maxBalance.toLocaleString()} USDC`
-                : `可用余额: $${maxBalance.toLocaleString()} USDC`
-              }
-            </p>
+            <p className="text-white/50 text-xs mt-2">{availableBalanceLabel}</p>
           </div>
 
-          <div className="p-4 bg-white/10 border border-white/20 rounded-lg space-y-3">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={toggleCopyInstantly}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggleCopyInstantly();
+              }
+            }}
+            className={`p-4 rounded-lg border space-y-3 transition-colors cursor-pointer ${
+              copyInstantly
+                ? 'bg-blue-500/10 border-blue-400/40'
+                : 'bg-white/10 border-white/20'
+            }`}
+          >
             <div className="flex items-center gap-3">
               <Checkbox
                 checked={copyInstantly}
                 onCheckedChange={(value: boolean | 'indeterminate') =>
                   setCopyInstantly(Boolean(value))
                 }
+                onClick={(event) => event.stopPropagation()}
                 className="border-white/50"
               />
               <span className="text-white text-sm">
@@ -227,8 +354,12 @@ export function CopyTradeModal({ trader, isOpen, onClose, lang, onConfirmCopy }:
             </div>
             <p className="text-white/50 text-xs">
               {lang === 'en'
-                ? 'We will open your wallet to confirm the contract interaction.'
-                : '点击交易后将拉起钱包进行合约确认。'}
+                ? copyInstantly
+                  ? 'We will open your wallet to confirm the contract interaction.'
+                  : 'You will only follow new trades after confirmation.'
+                : copyInstantly
+                  ? '点击交易后将拉起钱包进行合约确认。'
+                  : '确认后仅跟随后续交易，不会立刻建仓。'}
             </p>
           </div>
 
