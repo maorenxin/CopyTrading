@@ -12,7 +12,7 @@ import { t } from '../utils/translations';
 import { fetchTraders } from '../services/traders';
 
 export function TradingPlatform() {
-  const [lang, setLang] = useState<Language>('cn');
+  const [lang, setLang] = useState<Language>('en');
   const [colorMode, setColorMode] = useState<ColorMode>('standard');
   const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [sortBy, setSortBy] = useState<SortOption>('radarScore');
