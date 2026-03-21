@@ -189,9 +189,9 @@ export function RadarChart({
         {/* Data polygon */}
         <polygon
           points={getDataPoints()}
-          fill="rgba(0, 255, 136, 0.2)"
+          fill="rgba(0, 212, 255, 0.2)"
           fillOpacity="0.3"
-          stroke="#00ff88"
+          stroke="#00d4ff"
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -213,7 +213,7 @@ export function RadarChart({
               cx={x}
               cy={y}
               r="4"
-              fill="#00ff88"
+              fill="#00d4ff"
               stroke="white"
               strokeWidth="2"
             />
