@@ -14,7 +14,7 @@ import { fetchTraders } from '../services/traders';
 export function TradingPlatform() {
   const [lang, setLang] = useState<Language>('cn');
   const [colorMode, setColorMode] = useState<ColorMode>('standard');
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const [sortBy, setSortBy] = useState<SortOption>('radarScore');
   const [selectedTrader, setSelectedTrader] = useState<Trader | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -143,7 +143,7 @@ export function TradingPlatform() {
           <McpBanner lang={lang} />
 
           {/* Controls */}
-          <div className="mb-8">
+          <div className="mb-8 mt-6">
             <div className="flex items-center justify-between gap-3 flex-nowrap">
               <div className="flex gap-2 bg-[#0f172a]/80 backdrop-blur-md border border-[#00ff88]/10 rounded-lg p-1 shrink-0">
                 <Button
@@ -151,7 +151,7 @@ export function TradingPlatform() {
                   variant="ghost"
                   size="sm"
                   className={`${viewMode === 'card'
-                    ? 'bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88]/30'
+                    ? 'bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40 shadow-[0_0_8px_rgba(0,255,136,0.15)]'
                     : 'text-[#94a3b8] hover:text-white hover:bg-white/10'
                   }`}
                 >
@@ -163,7 +163,7 @@ export function TradingPlatform() {
                   variant="ghost"
                   size="sm"
                   className={`${viewMode === 'table'
-                    ? 'bg-[#00ff88]/20 text-[#00ff88] hover:bg-[#00ff88]/30'
+                    ? 'bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40 shadow-[0_0_8px_rgba(0,255,136,0.15)]'
                     : 'text-[#94a3b8] hover:text-white hover:bg-white/10'
                   }`}
                 >

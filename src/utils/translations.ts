@@ -3,7 +3,7 @@ import { Language } from '../types/trader';
 export const translations = {
     en: {
         // Header
-        platformTitle: 'Hyperliquid Vault Copy Trading',
+        platformTitle: 'Hyperliquid Copy Trading',
         platformSubtitle: 'Discover top-performing vaults and start copy trading',
 
         // View controls
@@ -95,7 +95,7 @@ export const translations = {
     },
     cn: {
         // Header
-        platformTitle: 'Hyperliquid 保险库跟单交易',
+        platformTitle: 'Hyperliquid跟单',
         platformSubtitle: '发现优质保险库，一键跟单',
 
         // View controls
