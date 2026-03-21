@@ -4,10 +4,7 @@ export const translations = {
     en: {
         // Header
         platformTitle: 'Hyperliquid Vault Copy Trading',
-        platformSubtitle: 'Follow professional traders and grow your portfolio',
-
-        // Navigation
-        myPortfolio: 'My Portfolio',
+        platformSubtitle: 'Discover top-performing vaults and start copy trading',
 
         // View controls
         cardView: 'Card View',
@@ -60,7 +57,6 @@ export const translations = {
         // Table headers
         traderAddress: 'Trader Address',
         radarChart: 'Performance',
-        aiStrategy: 'AI Investment Tag',
         cumulativeReturns: 'Cumulative Returns',
 
         // Time periods
@@ -69,40 +65,14 @@ export const translations = {
         '90D': '90 Days',
         'ALL': 'All Time',
 
-        // Copy trade modal
-        copyTradeTitle: 'Copy Trade',
-        copyTradeDescription: 'Automatically copy trades from this professional trader',
-        investmentAmount: 'Investment Amount',
-        selectAmount: 'Select amount or enter custom',
-        maxBalance: 'Max',
-        confirmInvestment: 'Confirm Investment',
-        cancel: 'Cancel',
-
         // Detail modal
         traderDetails: 'Trader Details',
         traderDetailsDescription: 'Comprehensive trading performance and history',
-        tradingHistory: 'Trading History',
         performanceMetrics: 'Performance Metrics',
-        balanceChart: 'Balance vs Bitcoin',
-        tradeHistory: 'Trade History',
         type: 'Type',
-        entry: 'Entry',
-        exit: 'Exit',
-        pnl: 'PnL',
-        size: 'Size',
         date: 'Date',
         long: 'Long',
         short: 'Short',
-
-        // Wallet
-    connectWallet: 'Connect Wallet',
-    disconnect: 'Disconnect',
-    connected: 'Connected',
-    connecting: 'Connecting...',
-    installWallet: 'Install Wallet',
-    walletUnavailable: 'Wallet extension not detected',
-    connectFailed: 'Connection failed',
-    retry: 'Retry',
 
         // Time ago
         minutesAgo: 'minutes ago',
@@ -117,14 +87,16 @@ export const translations = {
         activeTraders: 'Active Traders',
         totalFollowers: 'Total Followers',
         avgReturn: 'Avg Return',
+
+        // MCP Banner
+        mcpTitle: 'AI Agent Skill',
+        mcpDescription: 'Copy the prompt below and send it to any AI agent (Claude, ChatGPT, etc.) to let it analyze Vault data for you',
+        mcpCopied: 'Copied!',
     },
     cn: {
         // Header
         platformTitle: 'Hyperliquid 保险库跟单交易',
-        platformSubtitle: '跟随专业交易者，增长您的投资组合',
-
-        // Navigation
-        myPortfolio: '我的投资组合',
+        platformSubtitle: '发现优质保险库，一键跟单',
 
         // View controls
         cardView: '卡片视图',
@@ -177,7 +149,6 @@ export const translations = {
         // Table headers
         traderAddress: '交易者地址',
         radarChart: '绩效',
-        aiStrategy: 'AI投资标签',
         cumulativeReturns: '累计回报',
 
         // Time periods
@@ -186,40 +157,14 @@ export const translations = {
         '90D': '90天',
         'ALL': '全部',
 
-        // Copy trade modal
-        copyTradeTitle: '跟单交易',
-        copyTradeDescription: '自动复制此专业交易者的交易',
-        investmentAmount: '投资金额',
-        selectAmount: '选择金额或输入自定义',
-        maxBalance: '最大',
-        confirmInvestment: '确认投资',
-        cancel: '取消',
-
         // Detail modal
         traderDetails: '交易者详情',
         traderDetailsDescription: '全面的交易表现和历史记录',
-        tradingHistory: '交易历史',
         performanceMetrics: '绩效指标',
-        balanceChart: '余额对比比特币',
-        tradeHistory: '交易记录',
         type: '类型',
-        entry: '入场',
-        exit: '出场',
-        pnl: '盈亏',
-        size: '规模',
         date: '日期',
         long: '做多',
         short: '做空',
-
-        // Wallet
-    connectWallet: '连接钱包',
-    disconnect: '断开连接',
-    connected: '已连接',
-    connecting: '连接中...',
-    installWallet: '安装钱包',
-    walletUnavailable: '未检测到钱包扩展',
-    connectFailed: '连接失败',
-    retry: '重试',
 
         // Time ago
         minutesAgo: '分钟前',
@@ -234,6 +179,11 @@ export const translations = {
         activeTraders: '活跃交易者',
         totalFollowers: '总跟单数',
         avgReturn: '平均回报',
+
+        // MCP Banner
+        mcpTitle: 'AI Agent 技能',
+        mcpDescription: '复制下方提示词发送给任意 AI（Claude、ChatGPT 等），即可让 AI 帮你分析 Vault 数据',
+        mcpCopied: '已复制！',
     }
 };
 

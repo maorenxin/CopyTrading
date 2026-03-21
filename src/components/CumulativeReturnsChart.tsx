@@ -99,8 +99,8 @@ export function CumulativeReturnsChart({
               <div
                 className="text-sm text-white"
                 style={{
-                  backgroundColor: 'rgba(26, 11, 46, 0.95)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  backgroundColor: 'rgba(10, 14, 23, 0.95)',
+                  border: '1px solid rgba(0, 255, 136, 0.2)',
                   borderRadius: '8px',
                   padding: '8px 10px',
                 }}

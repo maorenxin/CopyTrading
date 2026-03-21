@@ -21,21 +21,14 @@ interface TraderCardProps {
 
 export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade }: TraderCardProps) {
   const isPositive = trader.allTimeReturn > 0;
-  const [isStrategyExpanded, setIsStrategyExpanded] = useState(false);
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
 
-  // Format address to 0x1234...5678
   const formatAddress = (address: string) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
-  /**
-   * 复制交易者地址，阻止触发卡片跳转。
-   * @param event - 点击事件。
-   */
   const handleCopyAddress = (event: React.MouseEvent<HTMLSpanElement>) => {
     event.stopPropagation();
-    // Fallback method for clipboard copy (works without HTTPS)
     const textArea = document.createElement('textarea');
     textArea.value = trader.address;
     textArea.style.position = 'fixed';
@@ -44,24 +37,19 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-
     try {
       document.execCommand('copy');
       setShowCopiedTooltip(true);
-      setTimeout(() => {
-        setShowCopiedTooltip(false);
-      }, 750);
+      setTimeout(() => setShowCopiedTooltip(false), 750);
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
-
     document.body.removeChild(textArea);
   };
 
   return (
     <Card
-      className="p-5 bg-white/10 backdrop-blur-md border-white/20 transition-all duration-300 hover:shadow-lg hover:shadow-white/10 cursor-pointer"
-      style={{ backdropFilter: 'blur(10px)' }}
+      className="p-5 bg-[#0f172a]/80 backdrop-blur-md border-[#00ff88]/10 transition-all duration-300 hover:shadow-lg hover:shadow-[#00ff88]/10 hover:border-[#00ff88]/30 cursor-pointer"
       role="button"
       tabIndex={0}
       onClick={() => onViewDetails(trader)}
@@ -72,100 +60,60 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
         }
       }}
     >
-      {/* Trader Address - Single Row */}
+      {/* Trader Address */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <p className="text-white/70 text-xs">{t('traderAddress', lang)}:</p>
+          <p className="text-[#94a3b8] text-xs">{t('traderAddress', lang)}:</p>
           <Tooltip open={showCopiedTooltip}>
             <TooltipTrigger asChild>
               <span
-                className="text-white font-mono text-sm cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] inline-block"
+                className="text-white font-mono text-sm cursor-pointer transition-all duration-300 hover:text-[#00ff88] hover:scale-[1.02] active:scale-[0.98] inline-block"
                 onClick={handleCopyAddress}
               >
                 {formatAddress(trader.address)}
               </span>
             </TooltipTrigger>
-            <TooltipContent className="bg-blue-500/90 border-blue-400/50 text-white backdrop-blur-sm">
+            <TooltipContent className="bg-[#00ff88]/90 border-[#00ff88]/50 text-black backdrop-blur-sm">
               {lang === 'en' ? 'Copied!' : '已复制！'}
             </TooltipContent>
           </Tooltip>
         </div>
-        <Badge className="bg-blue-500/20 text-blue-300 border-blue-400/30">
+        <Badge className="bg-[#00ff88]/20 text-[#00ff88] border-[#00ff88]/30">
           #{trader.rank}
         </Badge>
       </div>
 
-      {/* Radar Chart Section - Centered Five-Dimensional Chart */}
+      {/* Radar Chart */}
       <div className="mb-5 flex justify-center">
-        <RadarChart
-          metrics={trader.metrics}
-          trader={trader}
-          lang={lang}
-          size={320}
-        />
-      </div>
-
-      {/* AI Tags - With Tooltip */}
-      <div
-        className="-mt-3 mb-2 p-3 bg-blue-500/10 border border-blue-400/20 rounded-lg shadow-sm shadow-blue-500/10 transition-all duration-300"
-        onMouseEnter={(e) => {
-          const scrollDiv = e.currentTarget.querySelector('.ai-tags-scroll') as HTMLElement;
-          if (scrollDiv) {
-            scrollDiv.style.scrollbarColor = 'rgba(59, 130, 246, 0.5) transparent';
-          }
-        }}
-        onMouseLeave={(e) => {
-          const scrollDiv = e.currentTarget.querySelector('.ai-tags-scroll') as HTMLElement;
-          if (scrollDiv) {
-            scrollDiv.style.scrollbarColor = 'transparent transparent';
-          }
-        }}
-      >
-        <p className="text-blue-300 text-xs mb-2">
-          {lang === 'en' ? 'AI Investment Tag' : 'AI投资标签'}
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {trader.aiTags[lang].slice(0, 5).map((tag, index) => (
-            <Badge
-              key={index}
-              className="bg-blue-500/20 text-blue-200 border-blue-400/30 px-2 py-0.5 whitespace-nowrap"
-              style={{ fontSize: '0.65rem' }}
-            >
-              {tag}
-            </Badge>
-          ))}
-        </div>
+        <RadarChart metrics={trader.metrics} trader={trader} lang={lang} size={320} />
       </div>
 
       {/* Cumulative Returns Chart */}
       <div className="mb-4">
-        <p className="text-white/70 text-xs mb-2">
+        <p className="text-[#94a3b8] text-xs mb-2">
           {lang === 'en' ? 'Cumulative Returns' : '累计收益'}
         </p>
         <CumulativeReturnsChart data={trader.pnlData} height={120} colorMode={colorMode} lang={lang} />
       </div>
 
-      {/* All Metrics - Equal Priority */}
+      {/* Metrics Grid */}
       <div className="grid grid-cols-2 gap-2 mb-4">
-        {/* Followers */}
         <div className="p-2 bg-white/5 rounded-lg">
           <div className="flex items-center gap-1 mb-1">
-            <Users className="w-3 h-3 text-blue-400" />
-            <p className="text-white/70 text-xs">{t('followers', lang)}</p>
+            <Users className="w-3 h-3 text-[#00d4ff]" />
+            <p className="text-[#94a3b8] text-xs">{t('followers', lang)}</p>
           </div>
-          <p className="text-white text-lg">{trader.followerCount.toLocaleString()}</p>
+          <p className="text-white text-lg font-mono">{trader.followerCount.toLocaleString()}</p>
         </div>
 
-        {/* Win Rate */}
         <div className="p-2 bg-white/5 rounded-lg">
           <div className="flex items-center gap-1 mb-1">
-            <Target className="w-3 h-3 text-green-400" />
-            <p className="text-white/70 text-xs">{t('winRateLabel', lang)}</p>
+            <Target className="w-3 h-3 text-[#00ff88]" />
+            <p className="text-[#94a3b8] text-xs">{t('winRateLabel', lang)}</p>
           </div>
-          <p className="text-white text-lg">{formatPercentAbs(trader.winRatePercent, 1)}</p>
+          <p className="text-white text-lg font-mono">{formatPercentAbs(trader.winRatePercent, 1)}</p>
         </div>
 
-        {/* All-Time Return */}
         <div className="p-2 bg-white/5 rounded-lg">
           <div className="flex items-center gap-1 mb-1">
             {isPositive ? (
@@ -173,52 +121,45 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
             ) : (
               <TrendingDown className={`w-3 h-3 ${getValueColor(trader.allTimeReturn, colorMode)}`} />
             )}
-            <p className="text-white/70 text-xs">{t('allTimeReturnLabel', lang)}</p>
+            <p className="text-[#94a3b8] text-xs">{t('allTimeReturnLabel', lang)}</p>
           </div>
-          <p className={`text-lg ${getValueColor(trader.allTimeReturn, colorMode)}`}>
+          <p className={`text-lg font-mono ${getValueColor(trader.allTimeReturn, colorMode)}`}>
             {formatSignedPercent(trader.allTimeReturn, 1)}
           </p>
         </div>
 
-        {/* Time in Market */}
         <div className="p-2 bg-white/5 rounded-lg">
           <div className="flex items-center gap-1 mb-1">
-            <PieChart className="w-3 h-3 text-purple-400" />
-            <p className="text-white/70 text-xs">{t('timeInMarketLabel', lang)}</p>
+            <PieChart className="w-3 h-3 text-[#00d4ff]" />
+            <p className="text-[#94a3b8] text-xs">{t('timeInMarketLabel', lang)}</p>
           </div>
-          <p className="text-white text-lg">
-            {formatPercentAbs(trader.timeInMarketPercent, 0)}
-          </p>
+          <p className="text-white text-lg font-mono">{formatPercentAbs(trader.timeInMarketPercent, 0)}</p>
         </div>
 
-        {/* Avg. Hold Days */}
         <div className="p-2 bg-white/5 rounded-lg">
           <div className="flex items-center gap-1 mb-1">
-            <Hourglass className="w-3 h-3 text-orange-400" />
-            <p className="text-white/70 text-xs">{t('avgHoldDaysLabel', lang)}</p>
+            <Hourglass className="w-3 h-3 text-[#00d4ff]" />
+            <p className="text-[#94a3b8] text-xs">{t('avgHoldDaysLabel', lang)}</p>
           </div>
-          <p className="text-white text-lg">
-            {trader.avgHoldDays.toFixed(1)}
-          </p>
+          <p className="text-white text-lg font-mono">{trader.avgHoldDays.toFixed(1)}</p>
         </div>
 
-        {/* Avg Trades/Day */}
         <div className="p-2 bg-white/5 rounded-lg">
           <div className="flex items-center gap-1 mb-1">
-            <Activity className="w-3 h-3 text-blue-400" />
-            <p className="text-white/70 text-xs">{t('avgTradesPerDay', lang)}</p>
+            <Activity className="w-3 h-3 text-[#00d4ff]" />
+            <p className="text-[#94a3b8] text-xs">{t('avgTradesPerDay', lang)}</p>
           </div>
-          <p className="text-white text-lg">{trader.avgTradesPerDay.toFixed(1)}</p>
+          <p className="text-white text-lg font-mono">{trader.avgTradesPerDay.toFixed(1)}</p>
         </div>
       </div>
 
-      {/* Copy Trade Button Only */}
+      {/* Copy Trade Button */}
       <Button
         onClick={(e) => {
           e.stopPropagation();
           onCopyTrade(trader);
         }}
-        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+        className="w-full bg-gradient-to-r from-[#00ff88] to-[#00d4ff] hover:from-[#00ff88]/90 hover:to-[#00d4ff]/90 text-black font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
       >
         {t('copyTrade', lang)}
       </Button>

@@ -18,7 +18,7 @@ export function LanguageSwitcher({ currentLang, onLanguageChange }: LanguageSwit
       variant="outline"
       size="sm"
       onClick={toggleLanguage}
-      className="border-white/20 bg-white/5 hover:bg-white/10 transition-colors text-[rgb(255,255,255)] flex items-center justify-center gap-2 h-10"
+      className="border-[#00ff88]/20 bg-[#0f172a]/80 hover:bg-[#00ff88]/10 transition-colors text-[rgb(255,255,255)] flex items-center justify-center gap-2 h-10"
       title={currentLang === 'en' ? 'Switch to Chinese' : '切换到英文'}
     >
       <Globe className="w-4 h-4 text-white" />

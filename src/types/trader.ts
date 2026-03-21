@@ -74,17 +74,3 @@ export type Language = "en" | "cn";
 export type TimePeriod = "7D" | "30D" | "90D" | "ALL";
 export type ColorMode = "standard" | "inverted"; // standard: up=green, down=red; inverted: up=red, down=green
 
-export interface PortfolioPosition {
-  id: string;
-  trader: Trader;
-  amount: number;
-  createdAt: number;
-}
-
-export interface PortfolioSummary {
-  totalInvested: number;
-  totalValue: number;
-  totalProfit: number;
-  avgReturnPercent: number;
-  activeCopies: number;
-}

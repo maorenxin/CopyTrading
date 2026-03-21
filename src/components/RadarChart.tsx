@@ -111,7 +111,7 @@ export function RadarChart({
           y1={centerY}
           x2={x}
           y2={y}
-          stroke="rgba(255, 255, 255, 0.2)"
+          stroke="rgba(0, 212, 255, 0.15)"
           strokeWidth="0.6"
         />,
       );
@@ -153,7 +153,7 @@ export function RadarChart({
           <text
             x={x}
             y={y + 12}
-            fill="#60A5FA"
+            fill="#00d4ff"
             className="text-lg"
             fontWeight="600"
             textAnchor={textAnchor}
@@ -178,7 +178,7 @@ export function RadarChart({
             key={`ring-${i}`}
             points={getPentagonPoints(scale)}
             fill="none"
-            stroke="rgba(255, 255, 255, 0.2)"
+            stroke="rgba(0, 212, 255, 0.1)"
             strokeWidth="0.6"
           />
         ))}
@@ -189,9 +189,9 @@ export function RadarChart({
         {/* Data polygon */}
         <polygon
           points={getDataPoints()}
-          fill="#60A5FA"
+          fill="rgba(0, 255, 136, 0.2)"
           fillOpacity="0.3"
-          stroke="#60A5FA"
+          stroke="#00ff88"
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -213,7 +213,7 @@ export function RadarChart({
               cx={x}
               cy={y}
               r="4"
-              fill="#60A5FA"
+              fill="#00ff88"
               stroke="white"
               strokeWidth="2"
             />
