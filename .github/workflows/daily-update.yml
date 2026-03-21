@@ -23,8 +23,8 @@ jobs:
       - run: npm ci
       - run: pip install -r requirements.txt
 
-      # 缓存历史 CSV 数据（增量更新）
-      - uses: actions/cache@v4
+      # 恢复历史 CSV 缓存（增量更新）
+      - uses: actions/cache/restore@v4
         with:
           path: |
             vault_trades_data
@@ -48,3 +48,15 @@ jobs:
           git add -f public/data/traders.json VAULTS.csv
           git diff --staged --quiet || git commit -m "data: daily vault update $(date -u +%Y-%m-%d)"
           git push
+
+      # 无论成功失败都保存缓存，避免下次重新全量爬取
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            vault_trades_data
+            vault_funding_data
+            vault_nonfunding_ledger
+            crypto_data
+            vault_quantstat
+          key: vault-data-${{ github.run_number }}
