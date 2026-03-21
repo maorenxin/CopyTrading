@@ -6,8 +6,8 @@ const API_URL = process.env.HYPERLIQUID_API_URL || 'https://api-ui.hyperliquid.x
 const START_TIME = Number(process.env.VAULT_TRADES_START || 0);
 const END_TIME = Number(process.env.VAULT_TRADES_END || Date.now());
 const MAX_PAGES = Number(process.env.VAULT_TRADES_MAX_PAGES || 500);
-const SLEEP_MS = Number(process.env.VAULT_SLEEP_MS || 500);
-const MAX_RETRIES = 3;
+const SLEEP_MS = Number(process.env.VAULT_SLEEP_MS || 1000);
+const MAX_RETRIES = 5;
 
 const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;

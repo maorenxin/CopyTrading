@@ -45,6 +45,6 @@ jobs:
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/data/traders.json VAULTS.csv
+          git add -f public/data/traders.json VAULTS.csv
           git diff --staged --quiet || git commit -m "data: daily vault update $(date -u +%Y-%m-%d)"
           git push

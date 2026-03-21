@@ -14,7 +14,7 @@ except ImportError:
 
 API_URL = os.getenv("HYPERLIQUID_API_URL", "https://api-ui.hyperliquid.xyz")
 PROXY = os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
-SLEEP_MS = int(os.getenv("PRICE_SLEEP_MS", "200"))
+SLEEP_MS = int(os.getenv("PRICE_SLEEP_MS", "500"))
 
 COIN_SYMBOL_OVERRIDES = {
     "KPEPE": "kPEPEUSDT",
@@ -24,22 +24,32 @@ COIN_SYMBOL_OVERRIDES = {
 
 def make_request(payload: dict) -> list | dict | None:
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        f"{API_URL}/info",
-        data=data,
-        headers={"Content-Type": "application/json"},
-    )
     if PROXY:
         proxy_handler = urllib.request.ProxyHandler({"https": PROXY, "http": PROXY})
         opener = urllib.request.build_opener(proxy_handler)
     else:
         opener = urllib.request.build_opener()
-    try:
-        with opener.open(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except Exception as exc:
-        print(f"[warn] API request failed: {exc}")
-        return None
+    for attempt in range(4):
+        req = urllib.request.Request(
+            f"{API_URL}/info",
+            data=data,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with opener.open(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 and attempt < 3:
+                delay = 2 * (2 ** attempt)
+                print(f"[warn] 429, retry {attempt + 1}/3 in {delay}s")
+                time.sleep(delay)
+                continue
+            print(f"[warn] API request failed: {exc}")
+            return None
+        except Exception as exc:
+            print(f"[warn] API request failed: {exc}")
+            return None
+    return None
 
 
 def coin_to_symbol(coin: str) -> str:
