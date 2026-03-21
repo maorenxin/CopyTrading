@@ -516,27 +516,10 @@ def download_crypto_prices(
     """
     if not coins:
         return True
-    script_path = Path(__file__).resolve().parents[1] / "services" / "crypto-price-downloader.ts"
-    if not script_path.exists():
-        print(f"[warn] missing downloader: {script_path}")
-        return False
-    price_dir.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
-    env["CRYPTO_COINS"] = ",".join(sorted(set(coins)))
-    env["CRYPTO_INTERVAL"] = price_interval
-    env["CRYPTO_DATA_DIR"] = str(price_dir)
-    if start_time_ms is not None:
-        env["CRYPTO_DATA_START_TIME"] = str(start_time_ms)
-    try:
-        subprocess.run(
-            ["ts-node", str(script_path)],
-            check=True,
-            env=env,
-        )
-        return True
-    except Exception as exc:
-        print(f"[warn] crypto download failed: {exc}")
-        return False
+    # Price download is now handled by scripts/download-prices.py
+    # This function is kept as a no-op for compatibility
+    print(f"[info] skipping in-process price download (use scripts/download-prices.py)")
+    return True
 
 
 def ensure_price_data(
@@ -1181,7 +1164,6 @@ def main() -> None:
         )
 
     print(f"[info] summary saved to {summary_path}")
-    sync_quantstats_to_db(root_dir)
 
 
 if __name__ == "__main__":

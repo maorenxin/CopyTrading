@@ -69,6 +69,9 @@
             "generate-data": "npx ts-node --transpile-only scripts/generate-static-data.ts",
             "vault:scrape:local": "node server/scripts/local-vaults-scrape.js",
             "vault:trades:local": "node server/scripts/local-vault-trades.js",
+            "scrape:vaults": "npx ts-node --transpile-only scripts/scrape-vaults.ts",
+            "scrape:trades": "npx ts-node --transpile-only scripts/scrape-trades.ts",
+            "scrape:cashflows": "npx ts-node --transpile-only scripts/scrape-cashflows.ts",
             "test:e2e": "npx playwright test",
             "test:e2e:headed": "npx playwright test --headed"
       }

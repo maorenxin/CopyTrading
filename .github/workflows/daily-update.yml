@@ -1,0 +1,50 @@
+name: Daily Data Update
+on:
+  schedule:
+    - cron: '23 2 * * *'  # UTC 02:23 = 北京 10:23
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - run: pip install -r requirements.txt
+
+      # 缓存历史 CSV 数据（增量更新）
+      - uses: actions/cache@v4
+        with:
+          path: |
+            vault_trades_data
+            vault_funding_data
+            vault_nonfunding_ledger
+            crypto_data
+            vault_quantstat
+          key: vault-data-${{ github.run_number }}
+          restore-keys: vault-data-
+
+      - run: npx ts-node --transpile-only scripts/scrape-vaults.ts
+      - run: npx ts-node --transpile-only scripts/scrape-trades.ts
+      - run: npx ts-node --transpile-only scripts/scrape-cashflows.ts
+      - run: python scripts/download-prices.py
+      - run: python server/scripts/vault-quantstats.py --no-download-prices
+      - run: npx ts-node --transpile-only scripts/generate-static-data.ts
+
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/traders.json VAULTS.csv
+          git diff --staged --quiet || git commit -m "data: daily vault update $(date -u +%Y-%m-%d)"
+          git push
