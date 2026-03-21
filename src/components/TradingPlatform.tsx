@@ -138,12 +138,12 @@ export function TradingPlatform() {
         onColorModeChange={setColorMode}
       />
 
-      <div className="min-h-screen text-white p-4 md:p-6">
+      <main className="min-h-screen text-white p-4 md:p-6">
         <div className="max-w-[1800px] mx-auto">
           <McpBanner lang={lang} />
 
           {/* Controls */}
-          <div className="mb-8 mt-6">
+          <section aria-label="Sort and view controls" className="mb-8 mt-6">
             <div className="flex items-center justify-between gap-3 flex-nowrap">
               <div className="flex gap-2 bg-[#0f172a]/80 backdrop-blur-md border border-[#00ff88]/10 rounded-lg p-1 shrink-0">
                 <Button
@@ -197,9 +197,10 @@ export function TradingPlatform() {
                 </div>
               )}
             </div>
-          </div>
+          </section>
 
           {/* Main Content */}
+          <section aria-label="Vault rankings">
           {viewMode === 'card' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
               {displayedTraders.map((trader) => (
@@ -239,6 +240,7 @@ export function TradingPlatform() {
               <div ref={loadingRef} className="h-10"></div>
             </div>
           )}
+          </section>
         </div>
 
         <TraderDetailModal
@@ -252,7 +254,16 @@ export function TradingPlatform() {
           lang={lang}
           colorMode={colorMode}
         />
-      </div>
+      </main>
+
+      <footer className="text-center text-[#475569] text-xs py-6">
+        <p>
+          Hyperliquid Copy Trading — Vault rankings updated daily.{' '}
+          <a href="https://github.com/maorenxin/CopyTrading" target="_blank" rel="noopener noreferrer" className="underline hover:text-[#94a3b8]">
+            Open-source on GitHub
+          </a>
+        </p>
+      </footer>
     </>
   );
 }

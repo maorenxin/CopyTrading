@@ -1,0 +1,36 @@
+# Hyperliquid Copy Trading
+
+> Discover and copy trade 270+ Hyperliquid vaults ranked by quantitative metrics. Free, open-source, updated daily.
+
+## What This Site Does
+
+This is a free, open-source ranking dashboard for Hyperliquid copy-trading vaults. It fetches on-chain vault data daily via GitHub Actions, computes quantitative metrics (Sharpe ratio, annualized return, max drawdown, win rate), and presents a ranked leaderboard.
+
+## Key Metrics
+
+- **Radar Score**: Composite score (0–100) combining Sharpe, return, drawdown, win rate, and activity metrics.
+- **Sharpe Ratio**: Risk-adjusted return. Higher is better; above 1.0 is good, above 2.0 is excellent.
+- **Annualized Return (ARR)**: Projected yearly return based on historical performance.
+- **Max Drawdown (MDD)**: Largest peak-to-trough decline. Lower absolute value is better.
+- **Win Rate**: Percentage of profitable trades.
+- **Time in Market**: Percentage of time the vault has open positions.
+
+## Data
+
+- Live JSON data: https://maorenxin.github.io/CopyTrading/data/traders.json
+- Updated daily at ~02:23 UTC via GitHub Actions pipeline.
+- Source vaults listed in VAULTS.csv; trade history, funding, and ledger data processed through quantstats.
+
+## AI Skill (MCP Integration)
+
+Install the CopyTrading AI Skill to query vault data from any MCP-compatible AI assistant:
+
+```
+https://maorenxin.github.io/CopyTrading/skill/skill.json
+```
+
+## Links
+
+- Website: https://maorenxin.github.io/CopyTrading/
+- Source code: https://github.com/maorenxin/CopyTrading
+- Data API: https://maorenxin.github.io/CopyTrading/data/traders.json

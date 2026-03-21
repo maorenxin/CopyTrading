@@ -1,15 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hyperliquid Copy Trading — Top Vault Rankings</title>
+    <meta name="description" content="Discover and copy trade 270+ Hyperliquid vaults ranked by Sharpe ratio, annualized return, max drawdown, and win rate. Free, updated daily." />
+    <link rel="canonical" href="https://maorenxin.github.io/CopyTrading/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Hyperliquid Copy Trading — Top Vault Rankings" />
+    <meta property="og:description" content="270+ Hyperliquid vaults ranked by Sharpe, return, drawdown. Free and updated daily." />
+    <meta property="og:url" content="https://maorenxin.github.io/CopyTrading/" />
+    <meta property="og:site_name" content="Hyperliquid Copy Trading" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Hyperliquid Copy Trading" />
+    <meta name="twitter:description" content="270+ Hyperliquid vaults ranked by quantitative metrics." />
+    <meta name="robots" content="index, follow" />
+    <meta name="keywords" content="Hyperliquid, copy trading, vault, crypto, Sharpe ratio, DeFi" />
+    <meta name="theme-color" content="#0a0e17" />
+    <link rel="icon" href="/CopyTrading/favicon.svg" type="image/svg+xml" />
 
-  <!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>CopyTrading</title>
-    </head>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Hyperliquid Copy Trading",
+      "url": "https://maorenxin.github.io/CopyTrading/",
+      "description": "Free dashboard ranking 270+ Hyperliquid copy-trading vaults by quantitative metrics including Sharpe ratio, annualized return, max drawdown, and win rate.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Daily-updated vault rankings",
+        "Sharpe ratio analysis",
+        "Annualized return tracking",
+        "Max drawdown monitoring",
+        "Win rate statistics",
+        "Composite radar score",
+        "Card and table view modes",
+        "MCP AI Skill integration"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Hyperliquid copy trading?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Hyperliquid copy trading allows users to automatically replicate the trades of experienced vault managers on the Hyperliquid decentralized exchange. By depositing funds into a vault, your capital follows the same positions and strategies as the vault leader, proportional to your deposit size."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How are Hyperliquid vaults ranked on this site?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Vaults are ranked using a composite Radar Score (0–100) that combines multiple quantitative metrics: Sharpe ratio (risk-adjusted return), annualized return, maximum drawdown, win rate, time in market, and trading frequency. Users can also sort by any individual metric."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the Sharpe ratio and why does it matter for copy trading?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The Sharpe ratio measures risk-adjusted return — how much excess return you receive per unit of volatility. A Sharpe ratio above 1.0 indicates good risk-adjusted performance, and above 2.0 is considered excellent. It helps copy traders identify vaults that deliver consistent returns without excessive risk."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How often is the vault data updated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Vault data is updated daily at approximately 02:23 UTC via an automated GitHub Actions pipeline. The pipeline fetches on-chain trade history, computes quantitative metrics using quantstats, and publishes the results as a static JSON file."
+          }
+        }
+      ]
+    }
+    </script>
 
-    <body>
-      <div id="root"></div>
-      <script type="module" src="/src/main.tsx"></script>
-    </body>
-  </html>
-  
+    <!-- GitHub Pages SPA redirect handler -->
+    <script>
+      (function(){
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <noscript>
+      <div style="max-width:800px;margin:0 auto;padding:2rem;font-family:system-ui,sans-serif;color:#e2e8f0;background:#0a0e17">
+        <h1>Hyperliquid Copy Trading — Top Vault Rankings</h1>
+        <p>A free, open-source dashboard ranking 270+ Hyperliquid copy-trading vaults by quantitative metrics. Updated daily.</p>
+
+        <h2>Key Metrics</h2>
+        <ul>
+          <li><strong>Radar Score</strong> — Composite score (0–100) combining Sharpe, return, drawdown, win rate, and activity.</li>
+          <li><strong>Sharpe Ratio</strong> — Risk-adjusted return. Above 1.0 is good; above 2.0 is excellent.</li>
+          <li><strong>Annualized Return (ARR)</strong> — Projected yearly return based on historical performance.</li>
+          <li><strong>Max Drawdown (MDD)</strong> — Largest peak-to-trough decline. Lower absolute value is better.</li>
+          <li><strong>Win Rate</strong> — Percentage of profitable trades.</li>
+        </ul>
+
+        <h2>Data Access</h2>
+        <p>Raw vault data (JSON): <a href="https://maorenxin.github.io/CopyTrading/data/traders.json">traders.json</a></p>
+        <p>AI Skill (MCP): <a href="https://maorenxin.github.io/CopyTrading/skill/skill.json">skill.json</a></p>
+        <p>LLM site description: <a href="https://maorenxin.github.io/CopyTrading/llms.txt">llms.txt</a></p>
+        <p>Source code: <a href="https://github.com/maorenxin/CopyTrading">GitHub</a></p>
+      </div>
+    </noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
