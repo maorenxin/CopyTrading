@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fetch, ProxyAgent } from 'undici';
 
-const API_URL = process.env.HYPERLIQUID_API_URL || 'https://api-ui.hyperliquid.xyz';
+const STATS_URL = process.env.HYPERLIQUID_STATS_URL || 'https://stats-data.hyperliquid.xyz/Mainnet/vaults';
+const MIN_TVL = Number(process.env.VAULT_MIN_TVL || 10000);
 const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
 
@@ -12,76 +13,60 @@ const log = {
   error: (...args: unknown[]) => console.error('[scrape-vaults]', ...args),
 };
 
-interface VaultSummary {
-  vaultAddress?: string;
-  address?: string;
-  vault_address?: string;
-  name?: string;
-  createTimeMillis?: number;
-  relationshipType?: string;
-  summary?: Record<string, unknown>;
-  vault?: Record<string, unknown>;
+interface StatsVault {
+  apr?: number;
+  summary?: {
+    name?: string;
+    vaultAddress?: string;
+    leader?: string;
+    tvl?: string;
+    isClosed?: boolean;
+    relationship?: { type?: string };
+    createTimeMillis?: number;
+  };
   [key: string]: unknown;
 }
 
-function pickAddress(item: VaultSummary): string | undefined {
-  const s = item?.summary as VaultSummary | undefined;
-  return (
-    item?.vaultAddress ??
-    item?.vault_address ??
-    item?.address ??
-    s?.vaultAddress ??
-    s?.address
-  );
-}
-
-function pickField(item: VaultSummary, ...keys: string[]): unknown {
-  const s = (item?.summary ?? item?.vault ?? item) as Record<string, unknown>;
-  for (const k of keys) {
-    if (s?.[k] !== undefined) return s[k];
-    if (item?.[k] !== undefined) return item[k];
-  }
-  return undefined;
-}
-
-async function fetchVaultSummaries(): Promise<VaultSummary[]> {
-  const response = await fetch(`${API_URL}/info`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'vaultSummaries' }),
+async function fetchVaultsFromStats(): Promise<StatsVault[]> {
+  const response = await fetch(STATS_URL, {
     dispatcher,
-  });
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      Accept: 'application/json',
+      Referer: 'https://app.hyperliquid.xyz/',
+    },
+  } as any);
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`API error: ${response.status} ${text}`);
+    throw new Error(`stats API error: ${response.status}`);
   }
   const data = await response.json() as unknown;
   if (Array.isArray(data)) return data;
-  if (data && typeof data === 'object' && Array.isArray((data as any).vaults)) {
-    return (data as any).vaults;
-  }
   return [];
 }
 
 async function main() {
-  log.info('fetching vault summaries...');
-  const raw = await fetchVaultSummaries();
+  log.info('fetching vaults from stats-data...');
+  const raw = await fetchVaultsFromStats();
   log.info(`received ${raw.length} vaults`);
 
   const rows: string[] = ['vaultAddress,name,relationshipType,createTimeMillis'];
 
   let kept = 0;
   for (const item of raw) {
-    const addr = pickAddress(item);
-    if (!addr) continue;
+    const s = item.summary;
+    if (!s?.vaultAddress) continue;
 
-    const relType = String(pickField(item, 'relationshipType', 'relationship_type') ?? 'normal');
+    const relType = s.relationship?.type ?? 'normal';
     if (relType.toLowerCase() !== 'normal') continue;
+    if (s.isClosed) continue;
 
-    const name = String(pickField(item, 'name', 'vaultName', 'vault_name') ?? '').replace(/,/g, ' ');
-    const createTime = Number(pickField(item, 'createTimeMillis', 'create_time_millis') ?? 0);
+    const tvl = parseFloat(s.tvl ?? '0') || 0;
+    if (tvl < MIN_TVL) continue;
 
-    rows.push(`${addr.toLowerCase()},${name},${relType},${createTime}`);
+    const name = (s.name ?? '').replace(/,/g, ' ');
+    const createTime = s.createTimeMillis ?? 0;
+
+    rows.push(`${s.vaultAddress.toLowerCase()},${name},${relType},${createTime}`);
     kept++;
   }
 

@@ -1126,14 +1126,18 @@ def main() -> None:
             returns_out.index = returns_out.index.tz_localize(None)
         returns_out.to_frame("return").reset_index().to_csv(returns_output, index=False)
 
-        qs.reports.html(
-            returns_for_metrics,
-            benchmark=benchmark_returns,
-            output=str(html_output),
-            title=f"Vault NAV {vault_address}",
-            periods_per_year=periods_per_year,
-            match_dates=False,
-        )
+        try:
+            bm = benchmark_returns if not benchmark_returns.empty else None
+            qs.reports.html(
+                returns_for_metrics,
+                benchmark=bm,
+                output=str(html_output),
+                title=f"Vault NAV {vault_address}",
+                periods_per_year=periods_per_year,
+                match_dates=False,
+            )
+        except Exception as exc:
+            print(f"[warn] html report failed for {vault_address}: {exc}")
 
         summary_row = {
             "vault_address": vault_address,
