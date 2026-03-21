@@ -18,8 +18,7 @@ Thumbs.db
 test-results/
 .smoke/
 
-# 可以后续补充的vault的相关数据
-VAULTS.csv
+# vault运行时数据（CI通过cache保留）
 vault_funding_data/
 vault_nonfunding_ledger/
 vault_trades_data/

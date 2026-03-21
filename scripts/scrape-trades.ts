@@ -6,7 +6,8 @@ const API_URL = process.env.HYPERLIQUID_API_URL || 'https://api-ui.hyperliquid.x
 const START_TIME = Number(process.env.VAULT_TRADES_START || 0);
 const END_TIME = Number(process.env.VAULT_TRADES_END || Date.now());
 const MAX_PAGES = Number(process.env.VAULT_TRADES_MAX_PAGES || 500);
-const SLEEP_MS = Number(process.env.VAULT_SLEEP_MS || 200);
+const SLEEP_MS = Number(process.env.VAULT_SLEEP_MS || 500);
+const MAX_RETRIES = 3;
 
 const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
@@ -32,23 +33,36 @@ interface Fill {
 }
 
 async function fetchFills(user: string, startTime: number, endTime: number): Promise<Fill[] | null> {
-  try {
-    const response = await fetch(`${API_URL}/info`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'userFillsByTime', user, startTime, endTime }),
-      dispatcher,
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      log.warn(`API error for ${user}: ${response.status} ${text}`);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'userFillsByTime', user, startTime, endTime }),
+        dispatcher,
+      });
+      if (response.status === 429) {
+        const delay = 2000 * Math.pow(2, attempt);
+        log.warn(`429 for ${user}, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms`);
+        await sleep(delay);
+        continue;
+      }
+      if (!response.ok) {
+        const text = await response.text();
+        log.warn(`API error for ${user}: ${response.status} ${text}`);
+        return null;
+      }
+      return (await response.json()) as Fill[];
+    } catch (err: any) {
+      log.warn(`fetch failed for ${user}: ${err.message}`);
+      if (attempt < MAX_RETRIES) {
+        await sleep(2000 * Math.pow(2, attempt));
+        continue;
+      }
       return null;
     }
-    return (await response.json()) as Fill[];
-  } catch (err: any) {
-    log.warn(`fetch failed for ${user}: ${err.message}`);
-    return null;
   }
+  return null;
 }
 
 function loadVaults(): string[] {
