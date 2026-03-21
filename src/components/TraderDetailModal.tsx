@@ -158,8 +158,7 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
           <div className="p-4 bg-[#0f172a]/80 backdrop-blur-md border border-[#00ff88]/10 rounded-lg">
             <Button
               onClick={() => onCopyTrade(trader)}
-              className="w-full bg-gradient-to-r from-[#00ff88] to-[#00d4ff] hover:from-[#00ff88]/90 hover:to-[#00d4ff]/90 text-black font-semibold transition-all duration-200 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
-              variant="ghost"
+              className="w-full bg-[#00d4ff] hover:bg-[#00b8e6] text-black font-semibold transition-all duration-200 cursor-pointer shadow-[0_0_12px_rgba(0,212,255,0.2)] hover:shadow-[0_0_20px_rgba(0,212,255,0.4)]"
             >
               {t('copyTrade', lang)}
             </Button>

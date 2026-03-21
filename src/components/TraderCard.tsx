@@ -159,7 +159,7 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
           e.stopPropagation();
           onCopyTrade(trader);
         }}
-        className="w-full bg-[#00d4ff] hover:bg-[#00d4ff]/80 text-black font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:shadow-[0_0_20px_rgba(0,212,255,0.3)]"
+        className="w-full bg-[#00d4ff] hover:bg-[#00b8e6] text-black font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-[0_0_12px_rgba(0,212,255,0.2)] hover:shadow-[0_0_20px_rgba(0,212,255,0.4)]"
       >
         {t('copyTrade', lang)}
       </Button>
