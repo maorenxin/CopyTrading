@@ -156,6 +156,8 @@ test.describe('Vault Data Integrity', () => {
 
   test('multiple traders are loaded (pagination)', async ({ page }) => {
     const rows = page.locator('table tbody tr');
+    // Wait for rows to appear (may take longer on remote)
+    await expect(rows.first()).toBeVisible({ timeout: 15000 });
     const count = await rows.count();
     // Should have at least 8 traders (initial load)
     expect(count).toBeGreaterThanOrEqual(8);

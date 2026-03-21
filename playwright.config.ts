@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 30000,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:4173',
     headless: true,
     screenshot: 'only-on-failure',
   },
@@ -15,7 +15,7 @@ export default defineConfig({
       use: { browserName: 'chromium' },
     },
   ],
-  webServer: {
+  webServer: process.env.TEST_BASE_URL ? undefined : {
     command: 'npx vite preview --port 4173',
     port: 4173,
     reuseExistingServer: !process.env.CI,
