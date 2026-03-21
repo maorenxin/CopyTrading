@@ -47,7 +47,7 @@ export function McpBanner({ lang }: McpBannerProps) {
             {t('mcpDescription', lang)}
           </p>
           <div className="flex items-center gap-2">
-            <div className="flex-1 min-w-0 bg-[#0a0e17] border border-[#00d4ff]/10 rounded-md px-3 py-2 font-mono text-xs text-[#e2e8f0] truncate">
+            <div className="flex-1 min-w-0 bg-[#0a0e17] border border-[#00d4ff]/10 rounded-md px-3 py-2 font-mono text-xs text-[#e2e8f0] overflow-x-auto whitespace-nowrap">
               {INSTALL_CMD}
             </div>
             <Button

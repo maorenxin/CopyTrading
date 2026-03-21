@@ -254,6 +254,7 @@ export function TraderTableView({
                       onCopyTrade(trader);
                     }}
                     className="bg-gradient-to-r from-[#00ff88] to-[#00d4ff] hover:from-[#00ff88]/90 hover:to-[#00d4ff]/90 text-black font-semibold text-xs px-3 py-1 hover:shadow-[0_0_12px_rgba(0,255,136,0.3)]"
+                    variant="ghost"
                   >
                     <ExternalLink className="w-3 h-3 mr-1" />
                     {t('copyTrade', lang)}
