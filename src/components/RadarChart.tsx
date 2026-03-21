@@ -154,7 +154,7 @@ export function RadarChart({
             x={x}
             y={y + 12}
             fill="#00d4ff"
-            className="text-lg"
+            fontSize={dim.displayValue.length > 7 ? 12 : dim.displayValue.length > 5 ? 14 : 18}
             fontWeight="600"
             textAnchor={textAnchor}
           >

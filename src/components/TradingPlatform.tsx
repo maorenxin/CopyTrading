@@ -179,7 +179,7 @@ export function TradingPlatform() {
                     <SelectTrigger className="w-[160px] bg-[#0f172a]/80 backdrop-blur-md border-[#00ff88]/10 text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#0a0e17] border-[#00ff88]/20 text-white">
+                    <SelectContent className="!bg-[#0a0e17] border-[#00ff88]/20 text-white">
                       <SelectItem value="radarScore">{t('compositeRank', lang)}</SelectItem>
                       <SelectSeparator className="my-1 h-px bg-[#00ff88]/10" />
                       <SelectItem value="annualizedReturn">{t('arr', lang)}</SelectItem>
