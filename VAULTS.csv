@@ -1,12 +1,11 @@
 vaultAddress,name,relationshipType,createTimeMillis
 0x026a2e082a03200a00a97974b7bf7753ce33540f,Sentiment Edge,normal,1738339508305
-0x03449eade411f84543752ba4352f48243bd743ce,[ Tachyon ] ALTS ,normal,1762796987520
 0x04c8e82bbd0a33d3179e767c262223f50e74f7d2,Danny Ocean,normal,1744388373659
 0x0512943ce80e9ff832c3b4a3b25df9e9ed64d911,Growi_test,normal,1735901554037
 0x060d01aa996003b3731a992462d7f0ba68bf3b04,Edge & Hedge,normal,1765383115883
 0x071a1341c9d00a5537ff4bf8289049f045fe3abb,HyperSonic,normal,1769278749728
+0x07372a6543b694e3a77a6b03a2f7dc6e9d8493d8,Goat Capital,normal,1772749624708
 0x07fd993f0fa3a185f7207adccd29f7a87404689d,[ Systemic Strategies ] L/S Grids,normal,1737611331869
-0x08e0f532b2940fb10683d80a8d7034fbce5a3aff,Didibaba,normal,1733201758083
 0x0a8499b5e925d95badc893ec7f0b1613e08f6d7c,Order Block Hunter,normal,1768895107462
 0x0afebb3d2936d6c6144608155920e32b5c3fad85,OnFOMO.com Top-3,normal,1757950141900
 0x0c4933c830c0ff84783d38f68d9284ba77638add,Trader D,normal,1772809961529
@@ -17,7 +16,6 @@ vaultAddress,name,relationshipType,createTimeMillis
 0x115849ce84370f25cadcf0d348510d73837e1aa5,Orbit Value Strategies,normal,1765765752661
 0x131398cf559514af8531ce246de9817decb4bd90,Relative Value Strategies,normal,1771138123505
 0x131ab0c5032079bb9286ffc1828e11d5931e77bb,[ Tachyon ] HYPE ,normal,1762869959336
-0x13d0a9def6357d08241bc10163807d6e037bc3ca,[ Tachyon ] XYZ,normal,1762762325573
 0x1438d75830f530fd4d68ec650549dcc34ae987fa,Guarantee Trades,normal,1768506113708
 0x149b47e62de45cd73b67054eaca8d2e77bab4c38,Satori Quantum Vault,normal,1738817211998
 0x152a8bfb92d3ee5fa0c89321695d1fd385085f90,Snipe trading Bear market ,normal,1770338612006
@@ -159,7 +157,6 @@ vaultAddress,name,relationshipType,createTimeMillis
 0xa1b6d8efbcb2fb750a84dbc05649fa4968034f04,PF1,normal,1749767127564
 0xa415c4ded17cac76a1d81a54d9f4aeb48ffd4dd0,BitRocket,normal,1742105544061
 0xa6a34f0bf2ccea9a1ddf9e9a973f17c498dc5e40,FC Genesis - Quantum,normal,1757706873152
-0xa7ed03d702d1c3fae1d3554295b2a13df54219f4,TROLOLOLOL,normal,1770971341500
 0xa7f152a5f79bb5483c079610203d8fc03fd77c8e,Winwin,normal,1722832887745
 0xa844d7ac9fa3424c4fd38a25baa23e460ec3e802,69 Jump Street,normal,1737089779488
 0xa8a05f0c347eeece9b2581f33aa849ec8569a0ac,Vapor Vault,normal,1743790772634
@@ -209,7 +206,6 @@ vaultAddress,name,relationshipType,createTimeMillis
 0xe40cb11e79bc6c046a53df495b908b11864c75c2,BTC 2X Bitcoin and Gold Daily Rebalancing ,normal,1772634300293
 0xe46f2b9deac9a8e9f7175a3ce57c5e02922bbae1,Odyssey Altcoins,normal,1755697688151
 0xe4be02d34bfa56815bb3fb0ab6308d67d3409b76,bullmarket tings,normal,1731337962849
-0xe528531fc82ab104397fe06c550f0bb00720e0ab,$100K Target,normal,1768211818707
 0xe67dbf2d051106b42104c1a6631af5e5a458b682,Overdose,normal,1765126910504
 0xe6b679488d19045a5e4cf7815e35ddc98d0479fa,BTC AUREX,normal,1770072071132
 0xe72ac0f30dca336d04c8417c3e513b0ff3a69d3e,Crypto Cycle Trading,normal,1737037424091
