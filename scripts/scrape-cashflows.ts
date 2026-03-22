@@ -80,8 +80,17 @@ function getLastTimestamp(csvPath: string): number {
   const content = fs.readFileSync(csvPath, 'utf-8').trim();
   const lines = content.split('\n');
   if (lines.length < 2) return 0;
+  // Detect time column index from header
+  const header = lines[0].split(',');
+  let timeIdx = 0;
+  for (let i = 0; i < header.length; i++) {
+    if (header[i].trim().toLowerCase() === 'time') {
+      timeIdx = i;
+      break;
+    }
+  }
   const lastLine = lines[lines.length - 1];
-  const time = Number(lastLine.split(',')[0]);
+  const time = Number(lastLine.split(',')[timeIdx]);
   return Number.isFinite(time) ? time : 0;
 }
 
