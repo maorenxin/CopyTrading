@@ -49,7 +49,7 @@ async function main() {
   const raw = await fetchVaultsFromStats();
   log.info(`received ${raw.length} vaults`);
 
-  const rows: string[] = ['vaultAddress,name,relationshipType,createTimeMillis'];
+  const rows: string[] = ['vaultAddress,name,relationshipType,createTimeMillis,apr,tvl'];
 
   let kept = 0;
   for (const item of raw) {
@@ -66,7 +66,7 @@ async function main() {
     const name = (s.name ?? '').replace(/,/g, ' ');
     const createTime = s.createTimeMillis ?? 0;
 
-    rows.push(`${s.vaultAddress.toLowerCase()},${name},${relType},${createTime}`);
+    rows.push(`${s.vaultAddress.toLowerCase()},${name},${relType},${createTime},${item.apr ?? ''},${tvl}`);
     kept++;
   }
 

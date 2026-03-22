@@ -57,7 +57,8 @@ function buildPnlDataFromNavJson(navJson: unknown) {
       const timestamp = point.timestamp ?? point.time ?? point.date;
       const nav = point.nav ?? point.value ?? point.vault_equity;
       if (!timestamp || nav === undefined || nav === null) return null;
-      const timeMs = new Date(String(timestamp)).getTime();
+      const tsNum = Number(timestamp);
+      const timeMs = Number.isFinite(tsNum) && tsNum > 1e12 ? tsNum : new Date(String(timestamp)).getTime();
       if (!Number.isFinite(timeMs)) return null;
       return { timestamp: timeMs, pnl: Math.round(Number(nav) * 100) / 100 };
     })
@@ -89,13 +90,22 @@ function buildFallbackPnlSeries(
 
 function buildTraderItems(rows: Array<Record<string, any>>) {
   return rows.map((row) => {
-    const balance = toNumber(row.balance ?? row.tvl_usdc ?? 0);
-    const annualizedReturn = toNumber(row.annualized_return, 0);
-    const allTimeReturn = toNumber(row.all_time_return, 0);
+    const hlTvl = toNumber(row.hl_tvl, NaN);
+    const balance = Number.isFinite(hlTvl) ? hlTvl : toNumber(row.balance ?? row.tvl_usdc ?? 0);
+
+    const hlApr = toNumber(row.hl_apr, NaN);
+    const annualizedReturn = Number.isFinite(hlApr) ? hlApr * 100 : toNumber(row.annualized_return, 0);
+
+    const hlPnl = toNumber(row.hl_all_time_pnl, NaN);
+    const hlAllTimeReturn = Number.isFinite(hlPnl) && Number.isFinite(hlTvl) && (hlTvl - hlPnl) > 0
+      ? (hlPnl / (hlTvl - hlPnl)) * 100
+      : NaN;
+    const rawAllTimeReturn = toNumber(row.all_time_return, 0);
     const navStart = toNumber(row.nav_start, 0);
     const navEnd = toNumber(row.nav_end, 0);
     const computedReturn =
       navStart > 0 && navEnd > 0 ? ((navEnd - navStart) / navStart) * 100 : 0;
+    const allTimeReturn = Number.isFinite(hlAllTimeReturn) ? hlAllTimeReturn : (rawAllTimeReturn || computedReturn);
     const drawdownValue = toNumber(row.mdd ?? row.max_drawdown ?? 0, 0);
     const absDrawdown = Math.abs(drawdownValue);
     const drawdownPercent = absDrawdown <= 1 ? absDrawdown * 100 : absDrawdown;
@@ -126,20 +136,22 @@ function buildTraderItems(rows: Array<Record<string, any>>) {
       metrics.balance,
     ]);
 
+    const hlNavSeries = buildPnlDataFromNavJson(row.hl_nav_json);
     const navSeries = buildPnlDataFromNavJson(row.nav_json);
     const fallbackSeries = buildFallbackPnlSeries(navStart, navEnd, row.last_trade_at);
+    const pnlData = hlNavSeries.length > 0 ? hlNavSeries : (navSeries.length ? navSeries : fallbackSeries);
 
     return {
       id: row.vault_address,
       address: row.vault_address,
       rank: 0, // will be set after sorting
       metrics,
-      pnlData: navSeries.length ? navSeries : fallbackSeries,
+      pnlData,
       aiStrategy: { en: '', cn: '' },
       aiTags: { en: [] as string[], cn: [] as string[] },
       traderAgeDays,
       followerCount: Math.max(0, Math.trunc(toNumber(row.follower_count ?? 0, 0))),
-      allTimeReturn: allTimeReturn || computedReturn,
+      allTimeReturn,
       annualizedReturn,
       sharpeRatio,
       maxDrawdownPercent: drawdownPercent,

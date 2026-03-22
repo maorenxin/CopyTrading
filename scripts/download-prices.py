@@ -19,6 +19,10 @@ SLEEP_MS = int(os.getenv("PRICE_SLEEP_MS", "500"))
 COIN_SYMBOL_OVERRIDES = {
     "KPEPE": "kPEPEUSDT",
     "KBONK": "kBONKUSDT",
+    "KSHIB": "kSHIBUSDT",
+    "KFLOKI": "kFLOKIUSDT",
+    "KLUNC": "kLUNCUSDT",
+    "KNEIRO": "kNEIROUSDT",
 }
 
 

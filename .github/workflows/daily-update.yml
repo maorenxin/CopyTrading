@@ -32,10 +32,12 @@ jobs:
             vault_nonfunding_ledger
             crypto_data
             vault_quantstat
+            vault_hl_pnl
           key: vault-data-v2-${{ github.run_number }}
           restore-keys: vault-data-v2-
 
       - run: npx ts-node --transpile-only scripts/scrape-vaults.ts
+      - run: npx ts-node --transpile-only scripts/scrape-vault-pnl.ts
       - run: npx ts-node --transpile-only scripts/scrape-trades.ts
       - run: npx ts-node --transpile-only scripts/scrape-cashflows.ts
       - run: python scripts/download-prices.py
@@ -62,4 +64,5 @@ jobs:
             vault_nonfunding_ledger
             crypto_data
             vault_quantstat
+            vault_hl_pnl
           key: vault-data-v2-${{ github.run_number }}

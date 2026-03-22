@@ -16,6 +16,10 @@ _RESAMPLE_TZ = os.getenv("VAULT_RESAMPLE_TZ", "Asia/Shanghai")
 _COIN_SYMBOL_OVERRIDES = {
     "KPEPE": "kPEPEUSDT",
     "KBONK": "kBONKUSDT",
+    "KSHIB": "kSHIBUSDT",
+    "KFLOKI": "kFLOKIUSDT",
+    "KLUNC": "kLUNCUSDT",
+    "KNEIRO": "kNEIROUSDT",
 }
 
 
@@ -1008,6 +1012,49 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     vault_addresses = load_vault_addresses(vaults_csv, "normal")
     create_time_map = load_vault_create_time_map(vaults_csv)
+
+    # Load HL official data from VAULTS.csv (apr/tvl) and vault_hl_pnl/
+    hl_pnl_dir = root_dir / "vault_hl_pnl"
+    hl_vault_meta: dict[str, dict] = {}
+    try:
+        vaults_df = pd.read_csv(vaults_csv)
+        for _, row in vaults_df.iterrows():
+            addr = str(row.get("vaultAddress", "")).strip().lower()
+            if not addr:
+                continue
+            hl_vault_meta[addr] = {
+                "apr": row.get("apr") if pd.notna(row.get("apr")) else None,
+                "tvl": row.get("tvl") if pd.notna(row.get("tvl")) else None,
+            }
+    except Exception as exc:
+        print(f"[warn] failed reading VAULTS.csv for HL meta: {exc}")
+
+    def _load_hl_pnl(vault_addr: str) -> dict:
+        """Load HL official pnl data for a vault."""
+        result = {"pnl": None, "account_value": None, "nav_json": None}
+        hl_csv = hl_pnl_dir / f"{vault_addr}.csv"
+        if not hl_csv.exists():
+            return result
+        try:
+            df = pd.read_csv(hl_csv)
+        except Exception:
+            return result
+        if df.empty:
+            return result
+        last = df.iloc[-1]
+        result["account_value"] = float(last.get("accountValue", 0))
+        result["pnl"] = float(last.get("pnl", 0))
+        # Build nav_json from accountValueHistory
+        nav_points = []
+        for _, r in df.iterrows():
+            ts = r.get("timestamp")
+            av = r.get("accountValue")
+            if pd.notna(ts) and pd.notna(av):
+                nav_points.append({"timestamp": int(ts), "nav": float(av)})
+        if nav_points:
+            result["nav_json"] = json.dumps(nav_points, ensure_ascii=True)
+        return result
+
     if target_vault:
         vault_addresses = [addr for addr in vault_addresses if addr == target_vault]
     if not vault_addresses:
@@ -1205,6 +1252,15 @@ def main() -> None:
             "last_trade_at": last_trade_at,
             "nav_json": nav_json,
         }
+
+        # Add HL official metrics
+        meta = hl_vault_meta.get(vault_address, {})
+        hl_pnl_data = _load_hl_pnl(vault_address)
+        summary_row["hl_apr"] = meta.get("apr")
+        summary_row["hl_tvl"] = meta.get("tvl")
+        summary_row["hl_all_time_pnl"] = hl_pnl_data["pnl"]
+        summary_row["hl_nav_json"] = hl_pnl_data["nav_json"]
+
         upsert_summary_row(summary_path, summary_row)
 
         print(

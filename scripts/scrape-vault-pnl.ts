@@ -1,0 +1,130 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { fetch, ProxyAgent } from 'undici';
+
+const API_URL = process.env.HYPERLIQUID_API_URL || 'https://api-ui.hyperliquid.xyz';
+const SLEEP_MS = Number(process.env.VAULT_PNL_SLEEP_MS || 500);
+const MAX_RETRIES = 5;
+
+const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+
+const log = {
+  info: (...args: unknown[]) => console.log('[scrape-vault-pnl]', ...args),
+  warn: (...args: unknown[]) => console.warn('[scrape-vault-pnl]', ...args),
+  error: (...args: unknown[]) => console.error('[scrape-vault-pnl]', ...args),
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+interface PortfolioPeriod {
+  period?: string;
+  accountValueHistory?: Array<[number, string]>;
+  pnlHistory?: Array<[number, string]>;
+  [key: string]: unknown;
+}
+
+interface VaultDetails {
+  portfolio?: PortfolioPeriod[];
+  [key: string]: unknown;
+}
+
+async function fetchVaultDetails(vaultAddress: string): Promise<VaultDetails | null> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'vaultDetails', vaultAddress }),
+        dispatcher,
+      });
+      if (response.status === 429) {
+        const delay = 2000 * Math.pow(2, attempt);
+        log.warn(`429 for ${vaultAddress}, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms`);
+        await sleep(delay);
+        continue;
+      }
+      if (!response.ok) {
+        log.warn(`${vaultAddress}: HTTP ${response.status}`);
+        return null;
+      }
+      return (await response.json()) as VaultDetails;
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        await sleep(2000 * Math.pow(2, attempt));
+        continue;
+      }
+      log.warn(`${vaultAddress}: ${err}`);
+      return null;
+    }
+  }
+  return null;
+}
+
+function loadVaultAddresses(vaultsCsvPath: string): string[] {
+  if (!fs.existsSync(vaultsCsvPath)) return [];
+  const lines = fs.readFileSync(vaultsCsvPath, 'utf-8').trim().split('\n');
+  if (lines.length < 2) return [];
+  // header: vaultAddress,name,...
+  return lines.slice(1).map((line) => line.split(',')[0].trim().toLowerCase()).filter(Boolean);
+}
+
+async function main() {
+  const rootDir = path.resolve(__dirname, '..');
+  const vaultsCsv = path.resolve(rootDir, 'VAULTS.csv');
+  const outDir = path.resolve(rootDir, 'vault_hl_pnl');
+
+  const addresses = loadVaultAddresses(vaultsCsv);
+  if (!addresses.length) {
+    log.warn('no vaults found in VAULTS.csv');
+    return;
+  }
+
+  fs.mkdirSync(outDir, { recursive: true });
+  log.info(`fetching vaultDetails for ${addresses.length} vaults...`);
+
+  let success = 0;
+  for (const addr of addresses) {
+    const details = await fetchVaultDetails(addr);
+    if (!details?.portfolio) {
+      log.warn(`${addr}: no portfolio data`);
+      await sleep(SLEEP_MS);
+      continue;
+    }
+
+    const allTime = details.portfolio.find((p) => p.period === 'allTime');
+    if (!allTime) {
+      log.warn(`${addr}: no allTime period`);
+      await sleep(SLEEP_MS);
+      continue;
+    }
+
+    const accountValueHistory = allTime.accountValueHistory ?? [];
+    const pnlHistory = allTime.pnlHistory ?? [];
+
+    if (!accountValueHistory.length) {
+      log.warn(`${addr}: empty accountValueHistory`);
+      await sleep(SLEEP_MS);
+      continue;
+    }
+
+    const rows = ['timestamp,accountValue,pnl'];
+    for (let i = 0; i < accountValueHistory.length; i++) {
+      const [ts, av] = accountValueHistory[i];
+      const pnl = i < pnlHistory.length ? pnlHistory[i][1] : '0';
+      rows.push(`${ts},${av},${pnl}`);
+    }
+
+    const outPath = path.join(outDir, `${addr}.csv`);
+    fs.writeFileSync(outPath, rows.join('\n') + '\n');
+    success++;
+    await sleep(SLEEP_MS);
+  }
+
+  log.info(`done: ${success}/${addresses.length} vaults written to ${outDir}`);
+}
+
+main().catch((err) => {
+  log.error(err);
+  process.exitCode = 1;
+});
