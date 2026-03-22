@@ -88,7 +88,7 @@ function buildFallbackPnlSeries(
 
 // --- Main ---
 
-function buildTraderItems(rows: Array<Record<string, any>>) {
+function buildTraderItems(rows: Array<Record<string, any>>, nameMap: Record<string, string> = {}) {
   return rows.map((row) => {
     const hlTvl = toNumber(row.hl_tvl, NaN);
     const balance = Number.isFinite(hlTvl) ? hlTvl : toNumber(row.balance ?? row.tvl_usdc ?? 0);
@@ -143,6 +143,7 @@ function buildTraderItems(rows: Array<Record<string, any>>) {
 
     return {
       id: row.vault_address,
+      name: nameMap[(row.vault_address ?? '').toLowerCase()] ?? '',
       address: row.vault_address,
       rank: 0, // will be set after sorting
       metrics,
@@ -169,15 +170,28 @@ function buildTraderItems(rows: Array<Record<string, any>>) {
 }
 
 const csvPath = path.resolve(__dirname, '..', 'vault_quantstat.csv');
+const vaultsCsvPath = path.resolve(__dirname, '..', 'VAULTS.csv');
 const outPath = path.resolve(__dirname, '..', 'public', 'data', 'traders.json');
 
 const csvContent = fs.readFileSync(csvPath, 'utf-8');
 const parsed = Papa.parse(csvContent, { header: true, skipEmptyLines: true });
 const rows = parsed.data as Array<Record<string, any>>;
 
+// Load vault names from VAULTS.csv
+const vaultNameMap: Record<string, string> = {};
+if (fs.existsSync(vaultsCsvPath)) {
+  const vaultsCsv = fs.readFileSync(vaultsCsvPath, 'utf-8');
+  const vaultsParsed = Papa.parse(vaultsCsv, { header: true, skipEmptyLines: true });
+  for (const row of vaultsParsed.data as Array<Record<string, any>>) {
+    const addr = (row.vaultAddress ?? '').toLowerCase();
+    const name = row.name ?? '';
+    if (addr && name) vaultNameMap[addr] = name;
+  }
+}
+
 console.log(`Parsed ${rows.length} rows from CSV`);
 
-const items = buildTraderItems(rows);
+const items = buildTraderItems(rows, vaultNameMap);
 
 // Rank by radarScore descending
 items.sort((a, b) => b.radarScore - a.radarScore);

@@ -151,7 +151,7 @@ export function TradingPlatform() {
                   variant="ghost"
                   size="sm"
                   className={`${viewMode === 'card'
-                    ? 'bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40 shadow-[0_0_8px_rgba(0,255,136,0.15)]'
+                    ? '!bg-[#00ff88]/20 !text-[#00ff88] !border !border-[#00ff88]/40 shadow-[0_0_8px_rgba(0,255,136,0.15)]'
                     : 'text-[#94a3b8] hover:text-white hover:bg-white/10'
                   }`}
                 >
@@ -163,7 +163,7 @@ export function TradingPlatform() {
                   variant="ghost"
                   size="sm"
                   className={`${viewMode === 'table'
-                    ? 'bg-[#00ff88]/20 text-[#00ff88] border border-[#00ff88]/40 shadow-[0_0_8px_rgba(0,255,136,0.15)]'
+                    ? '!bg-[#00ff88]/20 !text-[#00ff88] !border !border-[#00ff88]/40 shadow-[0_0_8px_rgba(0,255,136,0.15)]'
                     : 'text-[#94a3b8] hover:text-white hover:bg-white/10'
                   }`}
                 >

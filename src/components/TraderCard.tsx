@@ -67,10 +67,10 @@ export function TraderCard({ trader, lang, colorMode, onViewDetails, onCopyTrade
           <Tooltip open={showCopiedTooltip}>
             <TooltipTrigger asChild>
               <span
-                className="text-white font-mono text-sm cursor-pointer transition-all duration-300 hover:text-[#00ff88] hover:scale-[1.02] active:scale-[0.98] inline-block"
+                className="text-white font-mono text-sm cursor-pointer transition-all duration-300 hover:text-[#00ff88] hover:scale-[1.02] active:scale-[0.98] inline-block truncate max-w-[200px]"
                 onClick={handleCopyAddress}
               >
-                {formatAddress(trader.address)}
+                {formatAddress(trader.address)}{trader.name ? ` (${trader.name})` : ''}
               </span>
             </TooltipTrigger>
             <TooltipContent className="bg-[#00ff88]/90 border-[#00ff88]/50 text-black backdrop-blur-sm">

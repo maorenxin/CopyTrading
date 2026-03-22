@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Trader, Language, ColorMode, TimePeriod } from '../types/trader';
 import { RadarChart } from './RadarChart';
 import { CumulativeReturnsChart } from './CumulativeReturnsChart';
+import { PnlChart } from './PnlChart';
 import { MetricTabs } from './MetricTabs';
 import { RiskNotice } from './RiskNotice';
 import { t } from '../utils/translations';
@@ -92,9 +93,9 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
                     <button
                       type="button"
                       onClick={handleCopyAddress}
-                      className="text-white font-mono text-sm hover:text-[#00ff88] cursor-pointer transition-colors"
+                      className="text-white font-mono text-sm hover:text-[#00ff88] cursor-pointer transition-colors break-all"
                     >
-                      {trader.address}
+                      {trader.address}{trader.name ? ` (${trader.name})` : ''}
                     </button>
                   </TooltipTrigger>
                   <TooltipContent className="bg-[#00ff88]/90 border-[#00ff88]/50 text-black backdrop-blur-sm">
@@ -151,6 +152,20 @@ export function TraderDetailModal({ trader, isOpen, onClose, onCopyTrade, lang, 
               colorMode={colorMode}
               lang={lang}
               showBtcComparison={false}
+            />
+          </div>
+
+          {/* PnL Chart (Account Value) */}
+          <div className="p-4 bg-[#0f172a]/80 backdrop-blur-md border border-[#00ff88]/10 rounded-lg">
+            <div className="flex flex-col gap-3 mb-4">
+              <h3 className="text-white">{lang === 'en' ? 'Account Value' : '账户价值'}</h3>
+              <MetricTabs value={timePeriod} onChange={setTimePeriod} />
+            </div>
+            <PnlChart
+              data={filteredPnlData}
+              height={320}
+              colorMode={colorMode}
+              lang={lang}
             />
           </div>
 

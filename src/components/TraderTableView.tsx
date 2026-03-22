@@ -195,8 +195,11 @@ export function TraderTableView({
                   </div>
                 </TableCell>
                 <TableCell className="text-white font-mono text-sm text-center">
-                  <div className="max-w-[150px] truncate mx-auto">
-                    {formatAddress(trader.address)}
+                  <div className="max-w-[150px] mx-auto">
+                    <div className="truncate">{formatAddress(trader.address)}</div>
+                    {trader.name && (
+                      <div className="text-[#94a3b8] text-xs truncate">{trader.name}</div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-center">

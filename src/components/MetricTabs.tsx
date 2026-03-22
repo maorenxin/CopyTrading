@@ -18,7 +18,11 @@ export function MetricTabs({ value, onChange }: MetricTabsProps) {
     <Tabs value={value} onValueChange={(next: string) => onChange(next as TimePeriod)}>
       <TabsList className="bg-white/10 border border-white/20">
         {options.map((option) => (
-          <TabsTrigger key={option} value={option} className="text-white/70">
+          <TabsTrigger
+            key={option}
+            value={option}
+            className="text-white/70 data-[state=active]:bg-[#00ff88]/20 data-[state=active]:text-[#00ff88] data-[state=active]:border-[#00ff88]/40 data-[state=active]:shadow-[0_0_8px_rgba(0,255,136,0.15)]"
+          >
             {option}
           </TabsTrigger>
         ))}

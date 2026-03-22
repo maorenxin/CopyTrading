@@ -27,6 +27,7 @@ export interface Trade {
 
 export interface Trader {
   id: string;
+  name: string;
   address: string;
   rank: number; // Ranking from backend
   metrics: TraderMetrics;
