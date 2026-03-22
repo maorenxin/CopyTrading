@@ -27,6 +27,7 @@ interface PortfolioPeriodData {
 type PortfolioEntry = [string, PortfolioPeriodData];
 
 interface VaultDetails {
+  name?: string;
   portfolio?: PortfolioEntry[];
   [key: string]: unknown;
 }
@@ -85,10 +86,27 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   log.info(`fetching vaultDetails for ${addresses.length} vaults...`);
 
+  // Load existing names.json to preserve names for vaults not in current VAULTS.csv
+  const namesPath = path.join(outDir, 'names.json');
+  let nameMap: Record<string, string> = {};
+  if (fs.existsSync(namesPath)) {
+    try { nameMap = JSON.parse(fs.readFileSync(namesPath, 'utf-8')); } catch {}
+  }
+
   let success = 0;
   for (const addr of addresses) {
     const details = await fetchVaultDetails(addr);
-    if (!details?.portfolio) {
+    if (!details) {
+      await sleep(SLEEP_MS);
+      continue;
+    }
+
+    // Always save name if available
+    if (details.name) {
+      nameMap[addr] = details.name;
+    }
+
+    if (!details.portfolio) {
       log.warn(`${addr}: no portfolio data`);
       await sleep(SLEEP_MS);
       continue;
@@ -123,6 +141,10 @@ async function main() {
     success++;
     await sleep(SLEEP_MS);
   }
+
+  // Save vault name mapping
+  fs.writeFileSync(namesPath, JSON.stringify(nameMap, null, 2) + '\n');
+  log.info(`saved ${Object.keys(nameMap).length} vault names to ${namesPath}`);
 
   log.info(`done: ${success}/${addresses.length} vaults written to ${outDir}`);
 }

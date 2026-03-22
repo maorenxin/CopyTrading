@@ -171,21 +171,30 @@ function buildTraderItems(rows: Array<Record<string, any>>, nameMap: Record<stri
 
 const csvPath = path.resolve(__dirname, '..', 'vault_quantstat.csv');
 const vaultsCsvPath = path.resolve(__dirname, '..', 'VAULTS.csv');
+const hlNamesPath = path.resolve(__dirname, '..', 'vault_hl_pnl', 'names.json');
 const outPath = path.resolve(__dirname, '..', 'public', 'data', 'traders.json');
 
 const csvContent = fs.readFileSync(csvPath, 'utf-8');
 const parsed = Papa.parse(csvContent, { header: true, skipEmptyLines: true });
 const rows = parsed.data as Array<Record<string, any>>;
 
-// Load vault names from VAULTS.csv
+// Load vault names: HL names.json (comprehensive) + VAULTS.csv (fallback)
 const vaultNameMap: Record<string, string> = {};
+if (fs.existsSync(hlNamesPath)) {
+  try {
+    const hlNames = JSON.parse(fs.readFileSync(hlNamesPath, 'utf-8'));
+    for (const [addr, name] of Object.entries(hlNames)) {
+      if (addr && name) vaultNameMap[addr.toLowerCase()] = name as string;
+    }
+  } catch {}
+}
 if (fs.existsSync(vaultsCsvPath)) {
   const vaultsCsv = fs.readFileSync(vaultsCsvPath, 'utf-8');
   const vaultsParsed = Papa.parse(vaultsCsv, { header: true, skipEmptyLines: true });
   for (const row of vaultsParsed.data as Array<Record<string, any>>) {
     const addr = (row.vaultAddress ?? '').toLowerCase();
     const name = row.name ?? '';
-    if (addr && name) vaultNameMap[addr] = name;
+    if (addr && name && !vaultNameMap[addr]) vaultNameMap[addr] = name;
   }
 }
 
