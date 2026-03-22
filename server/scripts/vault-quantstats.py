@@ -656,6 +656,8 @@ def build_nav_series(
     fund_idx = 0
     ledger_idx = 0
     cash = 0.0
+    total_shares = 0.0
+    last_positive_unit_nav = 1.0
     positions = {coin: 0.0 for coin in coins}
     cost_basis = {coin: 0.0 for coin in coins}
     nav_rows = []
@@ -681,7 +683,7 @@ def build_nav_series(
             fee = float(row["fee"]) if pd.notna(row["fee"]) else 0.0
 
             positions[coin] = positions.get(coin, 0.0) + signed_size
-            cost_basis[coin] = cost_basis.get(coin, 0.0) + px * signed_size + closed_pnl
+            cost_basis[coin] = cost_basis.get(coin, 0.0) + px * signed_size
             if abs(positions[coin]) < 1e-12:
                 positions[coin] = 0.0
                 cost_basis[coin] = 0.0
@@ -699,15 +701,17 @@ def build_nav_series(
             cash += amount
             funding_sum += amount
 
+        # Collect ledger (deposit/withdraw) events for this hour
+        ledger_events_this_hour: list[float] = []
         while ledger_idx < len(ledger_rows) and ledger_rows[ledger_idx]["time"] <= ts:
             row = ledger_rows[ledger_idx]
             ledger_idx += 1
             if prev_ts is not None and row["time"] <= prev_ts:
                 continue
             amount = float(row["amount"])
-            cash += amount
-            ledger_sum += amount
+            ledger_events_this_hour.append(amount)
 
+        # Calculate unrealized PnL before processing deposits
         unrealized = 0.0
         has_position = False
         for coin in coins:
@@ -725,10 +729,41 @@ def build_nav_series(
                 continue
             unrealized += size * (float(mark_price) - avg_entry)
 
+        # Process deposits/withdrawals using share-based method
+        for amount in ledger_events_this_hour:
+            total_asset_before = cash + unrealized
+            if total_shares > 0 and total_asset_before > 1e-6:
+                current_unit_nav = total_asset_before / total_shares
+                if current_unit_nav > 1e-9:
+                    last_positive_unit_nav = current_unit_nav
+                share_delta = amount / current_unit_nav
+            elif total_shares > 0 and total_asset_before <= 1e-6:
+                # NAV is zero or negative — use last known positive unit_nav
+                share_delta = amount / last_positive_unit_nav
+            else:
+                # First deposit: 1 share = 1 USDC
+                share_delta = amount
+            total_shares += share_delta
+            if total_shares < 1e-6:
+                total_shares = 0.0
+            cash += amount
+            ledger_sum += amount
+
+        # Recalculate total asset value after deposits
+        total_nav = cash + unrealized
+        if total_shares > 0:
+            unit_nav = max(total_nav / total_shares, 0.0)
+            if unit_nav > 1e-9:
+                last_positive_unit_nav = unit_nav
+        else:
+            unit_nav = 0.0
+
         nav_rows.append(
             {
                 "time": ts,
-                "nav": cash + unrealized,
+                "nav": total_nav,
+                "unit_nav": unit_nav,
+                "total_shares": total_shares,
                 "cash": cash,
                 "deposit_withdraw": ledger_sum,
                 "funding": funding_sum,
@@ -759,6 +794,8 @@ def resample_nav_frame(nav_df: pd.DataFrame, freq: str) -> pd.DataFrame:
         return nav_df
     agg_map = {
         "nav": "last",
+        "unit_nav": "last",
+        "total_shares": "last",
         "cash": "last",
         "unrealized_pnl": "last",
         "deposit_withdraw": "sum",
@@ -1034,7 +1071,8 @@ def main() -> None:
             print(f"[warn] skip {vault_address}, empty nav after resample")
             continue
 
-        nav_series = nav_frame["nav"]
+        nav_series = nav_frame["unit_nav"]
+        balance_series = nav_frame["nav"]
         returns = compute_returns(nav_series)
 
         returns_for_metrics = returns.copy()
@@ -1102,7 +1140,7 @@ def main() -> None:
             trader_age_hours = (
                 pd.Timestamp.now(tz=_RESAMPLE_TZ) - create_time
             ).total_seconds() / 3600.0
-        balance = float(nav_series.iloc[-1]) if not nav_series.empty else 0.0
+        balance = float(balance_series.iloc[-1]) if not balance_series.empty else 0.0
 
         nav_output = out_dir / f"{vault_address}.nav.csv"
         returns_output = out_dir / f"{vault_address}.returns.csv"
@@ -1114,7 +1152,7 @@ def main() -> None:
         nav_out.reset_index().to_csv(nav_output, index=False)
 
         nav_points = []
-        for ts, nav_value in nav_out["nav"].items():
+        for ts, nav_value in nav_out["unit_nav"].items():
             if pd.isna(nav_value):
                 continue
             timestamp = ts.to_pydatetime().isoformat()
