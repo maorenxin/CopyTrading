@@ -626,7 +626,14 @@ def build_nav_series(
         else:
             price_map[coin] = series
     if missing:
-        print(f"[warn] missing price data for coins: {', '.join(missing)}")
+        print(f"[warn] missing price data for coins: {', '.join(missing)}, skipping them")
+    if not price_map:
+        print(f"[warn] no price data available for any coin")
+        return pd.DataFrame()
+    # Filter trades to only coins with price data
+    coins = sorted(price_map.keys())
+    trades_df = trades_df[trades_df["coin"].isin(coins)]
+    if trades_df.empty:
         return pd.DataFrame()
 
     price_df = pd.concat(price_map, axis=1).sort_index()
