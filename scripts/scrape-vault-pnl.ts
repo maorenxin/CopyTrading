@@ -17,15 +17,17 @@ const log = {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-interface PortfolioPeriod {
-  period?: string;
+interface PortfolioPeriodData {
   accountValueHistory?: Array<[number, string]>;
   pnlHistory?: Array<[number, string]>;
   [key: string]: unknown;
 }
 
+// portfolio is an array of [periodName, data] tuples
+type PortfolioEntry = [string, PortfolioPeriodData];
+
 interface VaultDetails {
-  portfolio?: PortfolioPeriod[];
+  portfolio?: PortfolioEntry[];
   [key: string]: unknown;
 }
 
@@ -92,12 +94,13 @@ async function main() {
       continue;
     }
 
-    const allTime = details.portfolio.find((p) => p.period === 'allTime');
-    if (!allTime) {
+    const allTimeEntry = details.portfolio.find((p) => Array.isArray(p) && p[0] === 'allTime');
+    if (!allTimeEntry) {
       log.warn(`${addr}: no allTime period`);
       await sleep(SLEEP_MS);
       continue;
     }
+    const allTime = allTimeEntry[1];
 
     const accountValueHistory = allTime.accountValueHistory ?? [];
     const pnlHistory = allTime.pnlHistory ?? [];
