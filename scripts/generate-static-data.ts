@@ -91,7 +91,7 @@ function buildFallbackPnlSeries(
 function buildTraderItems(rows: Array<Record<string, any>>, nameMap: Record<string, string> = {}) {
   return rows.map((row) => {
     const hlTvl = toNumber(row.hl_tvl, NaN);
-    const balance = Number.isFinite(hlTvl) ? hlTvl : toNumber(row.balance ?? row.tvl_usdc ?? 0);
+    const balance = Number.isFinite(hlTvl) && hlTvl > 0 ? hlTvl : toNumber(row.balance ?? row.tvl_usdc ?? 0);
 
     const hlApr = toNumber(row.hl_apr, NaN);
     const annualizedReturn = Number.isFinite(hlApr) ? hlApr * 100 : toNumber(row.annualized_return, 0);
@@ -202,14 +202,27 @@ console.log(`Parsed ${rows.length} rows from CSV`);
 
 const items = buildTraderItems(rows, vaultNameMap);
 
+// Filter: only keep vaults in VAULTS.csv whitelist
+const activeVaults = new Set<string>();
+if (fs.existsSync(vaultsCsvPath)) {
+  const vaultsCsv = fs.readFileSync(vaultsCsvPath, 'utf-8');
+  const vaultsParsed = Papa.parse(vaultsCsv, { header: true, skipEmptyLines: true });
+  for (const row of vaultsParsed.data as Array<Record<string, any>>) {
+    const addr = (row.vaultAddress ?? '').toLowerCase();
+    if (addr) activeVaults.add(addr);
+  }
+}
+const activeItems = items.filter(item => activeVaults.has(item.address.toLowerCase()));
+console.log(`Filtered to ${activeItems.length} active vaults (from ${items.length} total)`);
+
 // Rank by radarScore descending
-items.sort((a, b) => b.radarScore - a.radarScore);
-items.forEach((item, index) => {
+activeItems.sort((a, b) => b.radarScore - a.radarScore);
+activeItems.forEach((item, index) => {
   item.rank = index + 1;
 });
 
 const output = {
-  items,
+  items: activeItems,
   generatedAt: new Date().toISOString(),
 };
 
@@ -217,4 +230,4 @@ fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, JSON.stringify(output));
 
 const sizeMB = (Buffer.byteLength(JSON.stringify(output)) / 1024 / 1024).toFixed(2);
-console.log(`Generated ${outPath} (${items.length} traders, ${sizeMB} MB)`);
+console.log(`Generated ${outPath} (${activeItems.length} traders, ${sizeMB} MB)`);

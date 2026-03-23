@@ -1270,6 +1270,20 @@ def main() -> None:
 
     print(f"[info] summary saved to {summary_path}")
 
+    # Clean up: remove rows not in VAULTS.csv whitelist
+    active_addrs = set(load_vault_addresses(vaults_csv, "normal"))
+    if active_addrs and summary_path.exists():
+        try:
+            df = pd.read_csv(summary_path)
+            before = len(df)
+            df = df[df["vault_address"].isin(active_addrs)]
+            df.to_csv(summary_path, index=False)
+            removed = before - len(df)
+            if removed > 0:
+                print(f"[info] cleaned {removed} stale rows from {summary_path}")
+        except Exception as exc:
+            print(f"[warn] failed cleaning summary csv: {exc}")
+
 
 if __name__ == "__main__":
     main()
