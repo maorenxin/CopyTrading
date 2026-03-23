@@ -49,7 +49,7 @@ export function RadarChart({
       displayValue: getTraderAge(),
     },
     {
-      name: lang === "en" ? "ARR" : "年化收益",
+      name: lang === "en" ? "APR" : "年化收益",
       value: metrics.annualReturn,
       displayValue: getAnnualReturn(),
     },

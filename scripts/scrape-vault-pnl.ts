@@ -138,6 +138,48 @@ async function main() {
 
     const outPath = path.join(outDir, `${addr}.csv`);
     fs.writeFileSync(outPath, rows.join('\n') + '\n');
+
+    // Accumulate daily data from "month" period
+    const monthEntry = details.portfolio.find((p) => Array.isArray(p) && p[0] === 'month');
+    if (monthEntry) {
+      const monthData = monthEntry[1];
+      const monthAV = monthData.accountValueHistory ?? [];
+      const monthPnl = monthData.pnlHistory ?? [];
+      if (monthAV.length > 0) {
+        const dailyDir = path.join(rootDir, 'vault_hl_pnl_daily');
+        fs.mkdirSync(dailyDir, { recursive: true });
+        const dailyPath = path.join(dailyDir, `${addr}.csv`);
+
+        // Read existing timestamps to avoid duplicates
+        const existingTs = new Set<number>();
+        if (fs.existsSync(dailyPath)) {
+          const lines = fs.readFileSync(dailyPath, 'utf-8').split('\n').slice(1);
+          for (const line of lines) {
+            const ts = parseInt(line.split(',')[0]);
+            if (!isNaN(ts)) existingTs.add(ts);
+          }
+        }
+
+        // Append new data points
+        const newRows: string[] = [];
+        for (let i = 0; i < monthAV.length; i++) {
+          const [ts, av] = monthAV[i];
+          if (!existingTs.has(ts)) {
+            const pnl = i < monthPnl.length ? monthPnl[i][1] : '0';
+            newRows.push(`${ts},${av},${pnl}`);
+          }
+        }
+
+        if (newRows.length > 0) {
+          if (fs.existsSync(dailyPath)) {
+            fs.appendFileSync(dailyPath, newRows.join('\n') + '\n');
+          } else {
+            fs.writeFileSync(dailyPath, 'timestamp,accountValue,pnl\n' + newRows.join('\n') + '\n');
+          }
+        }
+      }
+    }
+
     success++;
     await sleep(SLEEP_MS);
   }

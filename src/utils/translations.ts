@@ -33,7 +33,7 @@ export const translations = {
         traderAgeLabel: 'Trader Age',
         months: 'months',
         allTimeReturnLabel: 'All-Time Return',
-        annualizedReturnLabel: 'ARR',
+        annualizedReturnLabel: 'APR',
         sharpeLabel: 'Sharpe',
         maxDrawdownLabel: 'MDD',
         winRateLabel: 'Win Rate',
@@ -43,9 +43,9 @@ export const translations = {
         avgHoldDaysLabel: 'Avg. Hold Days',
 
         // Tooltip explanations
-        arrTooltip: 'Annual Return Rate: A measure of the percentage return on investment over a one-year period, annualized from actual performance data.',
-        sharpeTooltip: 'Sharpe Ratio: A metric that measures risk-adjusted returns by comparing excess return (above risk-free rate) to volatility. Higher values indicate better risk-adjusted performance.',
-        mddTooltip: 'Max Drawdown: The maximum observed loss from a peak to a trough before a new peak is attained. It measures the largest single drop in portfolio value.',
+        aprTooltip: 'Annual Percentage Rate: Hyperliquid official annualized return based on vault share price. This is the actual return an investor would receive.',
+        sharpeTooltip: 'Sharpe Ratio: A metric that measures risk-adjusted returns by comparing excess return (above risk-free rate) to volatility. Higher values indicate better risk-adjusted performance (approximate, derived from reconstructed NAV).',
+        mddTooltip: 'Max Drawdown: The maximum observed loss from a peak to a trough before a new peak is attained. It measures the largest single drop in portfolio value (approximate, derived from reconstructed NAV).',
 
         // Radar chart axes
         radarAge: 'Age',
@@ -125,7 +125,7 @@ export const translations = {
         traderAgeLabel: '交易年龄',
         months: '个月',
         allTimeReturnLabel: '累计回报',
-        annualizedReturnLabel: 'ARR',
+        annualizedReturnLabel: 'APR',
         sharpeLabel: '夏普',
         maxDrawdownLabel: 'MDD',
         winRateLabel: '胜率',
@@ -135,9 +135,9 @@ export const translations = {
         avgHoldDaysLabel: '平均持仓天数',
 
         // Tooltip explanations
-        arrTooltip: '年度回报率：衡量投资在一个年度内的百分比回报，从实际表现数据中年化得出。',
-        sharpeTooltip: '夏普比率：衡量风险调整后的回报率，通过比较超额回报（高于无风险利率）与波动性。较高的值表示更好的风险调整后的表现。',
-        mddTooltip: '最大回撤：从峰值到谷值的最大观察到的损失，在达到新的峰值之前。它衡量投资组合价值的最大单次下跌。',
+        aprTooltip: '年化收益率（APR）：Hyperliquid 官方基于份额净值计算的年化收益率，是投资者实际获得的收益率。',
+        sharpeTooltip: '夏普比率：衡量风险调整后的回报率，通过比较超额回报（高于无风险利率）与波动性。较高的值表示更好的风险调整后的表现（近似值，基于重建的净值序列计算）。',
+        mddTooltip: '最大回撤：从峰值到谷值的最大观察到的损失，在达到新的峰值之前。它衡量投资组合价值的最大单次下跌（近似值，基于重建的净值序列计算）。',
 
         // Radar chart axes
         radarAge: '年龄',

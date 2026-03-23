@@ -77,7 +77,7 @@ export function TraderTableView({
                     <Info className="w-4 h-4 text-[#94a3b8]/50 hover:text-[#94a3b8]/80 cursor-help" onClick={(e) => e.stopPropagation()} />
                   </TooltipTrigger>
                   <TooltipContent className="bg-[#0f172a] border border-[#00ff88]/20 text-white max-w-xs">
-                    {t('arrTooltip', lang)}
+                    {t('aprTooltip', lang)}
                   </TooltipContent>
                 </Tooltip>
                 <span>{t('annualizedReturnLabel', lang)}</span>
