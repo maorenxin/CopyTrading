@@ -106,9 +106,15 @@ function buildTraderItems(rows: Array<Record<string, any>>, nameMap: Record<stri
     const computedReturn =
       navStart > 0 && navEnd > 0 ? ((navEnd - navStart) / navStart) * 100 : 0;
     const allTimeReturn = Number.isFinite(hlAllTimeReturn) ? hlAllTimeReturn : (rawAllTimeReturn || computedReturn);
-    const drawdownValue = toNumber(row.mdd ?? row.max_drawdown ?? 0, 0);
-    const absDrawdown = Math.abs(drawdownValue);
-    const drawdownPercent = absDrawdown <= 1 ? absDrawdown * 100 : absDrawdown;
+    const hlMdd = toNumber(row.hl_mdd, NaN);
+    let drawdownPercent: number;
+    if (Number.isFinite(hlMdd)) {
+      drawdownPercent = Math.abs(hlMdd) * 100;
+    } else {
+      const drawdownValue = toNumber(row.mdd ?? row.max_drawdown ?? 0, 0);
+      const absDrawdown = Math.abs(drawdownValue);
+      drawdownPercent = absDrawdown <= 1 ? absDrawdown * 100 : absDrawdown;
+    }
     const winRateValue = toNumber(row.win_rate ?? 0, 0);
     const winRatePercent = winRateValue > 0 && winRateValue <= 1 ? winRateValue * 100 : winRateValue;
     const timeInMarketValue = toNumber(row.time_in_market ?? 0, 0);

@@ -1031,7 +1031,7 @@ def main() -> None:
 
     def _load_hl_pnl(vault_addr: str) -> dict:
         """Load HL official pnl data for a vault."""
-        result = {"pnl": None, "account_value": None, "nav_json": None}
+        result = {"pnl": None, "account_value": None, "nav_json": None, "mdd": None}
         hl_csv = hl_pnl_dir / f"{vault_addr}.csv"
         if not hl_csv.exists():
             return result
@@ -1044,6 +1044,24 @@ def main() -> None:
         last = df.iloc[-1]
         result["account_value"] = float(last.get("accountValue", 0))
         result["pnl"] = float(last.get("pnl", 0))
+        # Compute MDD using HL formula: (pnl - peak_pnl) / accountValue_at_peak_pnl
+        av_series = pd.to_numeric(df.get("accountValue"), errors="coerce")
+        pnl_series = pd.to_numeric(df.get("pnl"), errors="coerce")
+        max_pnl = float("-inf")
+        peak_av = 0.0
+        max_dd = 0.0
+        for av_val, pnl_val in zip(av_series, pnl_series):
+            if pd.isna(av_val) or pd.isna(pnl_val):
+                continue
+            if pnl_val > max_pnl:
+                max_pnl = pnl_val
+                peak_av = av_val
+            if peak_av > 0:
+                dd = (pnl_val - max_pnl) / peak_av
+                if dd < max_dd:
+                    max_dd = dd
+        if max_dd < 0:
+            result["mdd"] = max_dd  # negative decimal, e.g. -0.105 for 10.5%
         # Build nav_json from accountValueHistory
         nav_points = []
         for _, r in df.iterrows():
@@ -1259,6 +1277,7 @@ def main() -> None:
         summary_row["hl_apr"] = meta.get("apr")
         summary_row["hl_tvl"] = meta.get("tvl")
         summary_row["hl_all_time_pnl"] = hl_pnl_data["pnl"]
+        summary_row["hl_mdd"] = hl_pnl_data["mdd"]
         summary_row["hl_nav_json"] = hl_pnl_data["nav_json"]
 
         upsert_summary_row(summary_path, summary_row)
