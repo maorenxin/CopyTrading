@@ -1,168 +1,207 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { fetch, ProxyAgent } from 'undici';
+import * as fs from "fs";
+import * as path from "path";
+import { HyperliquidClient } from "../server/services/hyperliquid-client";
+import {
+  loadVaultAddressesFromCsv,
+  readLatestTimeFromCsv,
+  appendCsvRows,
+  scrapeByWindow,
+  sleep,
+  parseJsonMaybe,
+} from "../server/services/hyperliquid-utils";
+import { log } from "../server/services/logger";
 
-const API_URL = process.env.HYPERLIQUID_API_URL || 'https://api-ui.hyperliquid.xyz';
-const START_TIME = Number(process.env.VAULT_TRADES_START || 0);
-const END_TIME = Number(process.env.VAULT_TRADES_END || Date.now());
-const MAX_PAGES = Number(process.env.VAULT_TRADES_MAX_PAGES || 500);
-const SLEEP_MS = Number(process.env.VAULT_SLEEP_MS || 1000);
-const MAX_RETRIES = 5;
+// === 常量 ===
+const WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const BATCH_LIMIT = 2000;
+const MIN_WINDOW_MS = 60 * 1000;
+const MAX_SPLIT_DEPTH = 8;
+const RETRY = 10;
+const DELAY_MS = 200;
+const RETRY_DELAY_MS = 500;
+const RATE_LIMIT_DELAY_MS = 1500;
+const VAULT_SLEEP_MS = Number(process.env.VAULT_SLEEP_MS || 500);
 
-const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-const dispatcher = proxyUrl ? new ProxyAgent(proxyUrl) : undefined;
+const TRADE_COLUMNS = [
+  "vault_address",
+  "time",
+  "coin",
+  "side",
+  "dir",
+  "px",
+  "sz",
+  "start_position",
+  "closed_pnl",
+  "fee",
+  "fee_token",
+  "hash",
+  "oid",
+  "tid",
+  "crossed",
+  "twap_id",
+];
 
-const log = {
-  info: (...args: unknown[]) => console.log('[scrape-trades]', ...args),
-  warn: (...args: unknown[]) => console.warn('[scrape-trades]', ...args),
-  error: (...args: unknown[]) => console.error('[scrape-trades]', ...args),
-};
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-interface Fill {
+// === 类型 ===
+interface TradeEntry {
   time?: number;
   coin?: string;
-  dir?: string;
   side?: string;
-  px?: string | number;
-  sz?: string | number;
-  closedPnl?: string | number;
-  fee?: string | number;
+  dir?: string;
+  px?: string;
+  sz?: string;
+  startPosition?: string;
+  closedPnl?: string;
+  fee?: string;
+  feeToken?: string;
+  hash?: string;
+  oid?: string;
+  tid?: string;
+  crossed?: boolean;
+  twapId?: string;
   [key: string]: unknown;
 }
 
-async function fetchFills(user: string, startTime: number, endTime: number): Promise<Fill[] | null> {
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(`${API_URL}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'userFillsByTime', user, startTime, endTime }),
-        dispatcher,
-      });
-      if (response.status === 429) {
-        const delay = 2000 * Math.pow(2, attempt);
-        log.warn(`429 for ${user}, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms`);
-        await sleep(delay);
-        continue;
-      }
-      if (!response.ok) {
-        const text = await response.text();
-        log.warn(`API error for ${user}: ${response.status} ${text}`);
-        return null;
-      }
-      return (await response.json()) as Fill[];
-    } catch (err: any) {
-      log.warn(`fetch failed for ${user}: ${err.message}`);
-      if (attempt < MAX_RETRIES) {
-        await sleep(2000 * Math.pow(2, attempt));
-        continue;
-      }
-      return null;
-    }
-  }
-  return null;
+// === 工具函数 ===
+function isOldFormat(csvPath: string): boolean {
+  if (!fs.existsSync(csvPath)) return false;
+  const head = fs.readFileSync(csvPath, "utf-8").split("\n")[0] ?? "";
+  return !head.includes("vault_address");
 }
 
-function loadVaults(): string[] {
-  const csvPath = path.resolve(__dirname, '..', 'VAULTS.csv');
-  if (!fs.existsSync(csvPath)) {
-    log.error('VAULTS.csv not found');
-    return [];
+function dedupeTrades(trades: TradeEntry[]): TradeEntry[] {
+  const seen = new Set<string>();
+  const unique: TradeEntry[] = [];
+  for (const trade of trades) {
+    const key =
+      trade?.tid ??
+      trade?.hash ??
+      `${trade?.time ?? ""}-${trade?.oid ?? ""}-${trade?.coin ?? ""}-${trade?.px ?? ""}-${trade?.sz ?? ""}`;
+    if (seen.has(String(key))) continue;
+    seen.add(String(key));
+    unique.push(trade);
   }
-  const lines = fs.readFileSync(csvPath, 'utf-8').trim().split('\n');
-  return lines.slice(1).map((line) => line.split(',')[0].trim().toLowerCase()).filter(Boolean);
+  return unique;
 }
 
-function getLastTimestamp(csvPath: string): number {
-  if (!fs.existsSync(csvPath)) return 0;
-  const content = fs.readFileSync(csvPath, 'utf-8').trim();
-  const lines = content.split('\n');
-  if (lines.length < 2) return 0;
-  // Detect time column index from header
-  const header = lines[0].split(',');
-  let timeIdx = 0;
-  for (let i = 0; i < header.length; i++) {
-    if (header[i].trim().toLowerCase() === 'time') {
-      timeIdx = i;
-      break;
-    }
-  }
-  const lastLine = lines[lines.length - 1];
-  const time = Number(lastLine.split(',')[timeIdx]);
-  return Number.isFinite(time) ? time : 0;
+function buildCsvRows(trades: TradeEntry[], vaultAddress: string) {
+  return trades.map((t) => ({
+    vault_address: vaultAddress,
+    time: t?.time ?? null,
+    coin: t?.coin ?? null,
+    side: t?.side ?? null,
+    dir: t?.dir ?? null,
+    px: t?.px ?? null,
+    sz: t?.sz ?? null,
+    start_position: t?.startPosition ?? null,
+    closed_pnl: t?.closedPnl ?? null,
+    fee: t?.fee ?? null,
+    fee_token: t?.feeToken ?? null,
+    hash: t?.hash ?? null,
+    oid: t?.oid ?? null,
+    tid: t?.tid ?? null,
+    crossed: t?.crossed ?? null,
+    twap_id: t?.twapId ?? null,
+  }));
 }
 
-function appendToCsv(csvPath: string, fills: Fill[]): number {
-  const isNew = !fs.existsSync(csvPath);
-  const header = 'time,coin,dir,px,sz,closedPnl,fee';
-  const lines = fills.map((f) =>
-    [
-      f.time ?? 0,
-      f.coin ?? '',
-      f.dir ?? f.side ?? '',
-      f.px ?? 0,
-      f.sz ?? 0,
-      f.closedPnl ?? 0,
-      f.fee ?? 0,
-    ].join(',')
-  );
-  if (lines.length === 0) return 0;
-  const content = isNew ? header + '\n' + lines.join('\n') + '\n' : lines.join('\n') + '\n';
-  fs.appendFileSync(csvPath, content);
-  return lines.length;
-}
+// === 主逻辑 ===
+async function scrapeVault(
+  client: HyperliquidClient,
+  vaultAddress: string,
+  createTimeMillis: number | undefined,
+  outDir: string,
+): Promise<void> {
+  const addr = vaultAddress.toLowerCase();
+  const csvPath = path.join(outDir, `${addr}.csv`);
 
-async function scrapeVault(vault: string, outDir: string): Promise<void> {
-  const csvPath = path.join(outDir, `${vault}.csv`);
-  const lastTs = getLastTimestamp(csvPath);
-  let cursor = lastTs > 0 ? lastTs + 1 : START_TIME;
-  let pages = 0;
-  let total = 0;
-
-  while (cursor < END_TIME && pages < MAX_PAGES) {
-    const fills = await fetchFills(vault, cursor, END_TIME);
-    if (!Array.isArray(fills) || fills.length === 0) break;
-
-    // Sort by time
-    fills.sort((a, b) => (Number(a.time) || 0) - (Number(b.time) || 0));
-
-    const count = appendToCsv(csvPath, fills);
-    total += count;
-
-    const times = fills.map((f) => Number(f.time)).filter(Number.isFinite);
-    const maxTime = times.length > 0 ? Math.max(...times) : cursor;
-    const next = maxTime + 1;
-    if (!Number.isFinite(next) || next <= cursor) break;
-
-    cursor = next;
-    pages++;
+  // 检测旧格式 → 删除重爬
+  if (isOldFormat(csvPath)) {
+    log("warn", "old 7-col format detected, deleting for re-scrape", { vaultAddress: addr });
+    fs.unlinkSync(csvPath);
   }
 
-  if (total > 0) {
-    log.info(`${vault}: +${total} trades (${pages} pages)`);
+  // 确定起始时间
+  let baseStartTime = createTimeMillis;
+  if (typeof baseStartTime !== "number" || !Number.isFinite(baseStartTime)) {
+    baseStartTime = Date.now() - 3 * 365 * 24 * 60 * 60 * 1000;
   }
+
+  const latestTime = await readLatestTimeFromCsv(csvPath, "time");
+  const startTime =
+    typeof latestTime === "number" && latestTime >= baseStartTime
+      ? latestTime + 1
+      : baseStartTime;
+  const endTime = Date.now();
+
+  if (startTime >= endTime) return;
+
+  log("info", "trade scrape start", {
+    vaultAddress: addr,
+    startTime,
+    endTime,
+    resumeFrom: latestTime ?? null,
+  });
+
+  const trades = await scrapeByWindow<TradeEntry>({
+    startTime,
+    endTime,
+    windowMs: WINDOW_MS,
+    fetchWindow: async (wStart, wEnd) => {
+      const result = await client.fetchUserFillsByTime(addr, wStart, wEnd, false, true);
+      return Array.isArray(result) ? result : [];
+    },
+    label: "trade",
+    retry: RETRY,
+    retryDelayMs: RETRY_DELAY_MS,
+    delayMs: DELAY_MS,
+    rateLimitDelayMs: RATE_LIMIT_DELAY_MS,
+    batchLimit: BATCH_LIMIT,
+    minWindowMs: MIN_WINDOW_MS,
+    maxSplitDepth: MAX_SPLIT_DEPTH,
+    logContext: { vaultAddress: addr },
+  });
+
+  const unique = dedupeTrades(trades);
+  if (unique.length === 0) {
+    log("info", "trade scrape done (no new trades)", { vaultAddress: addr });
+    return;
+  }
+
+  const rows = buildCsvRows(unique, addr);
+  await appendCsvRows(csvPath, rows, { columns: TRADE_COLUMNS });
+  log("info", "trade scrape done", { vaultAddress: addr, count: unique.length });
 }
 
 async function main() {
-  const vaults = loadVaults();
-  if (vaults.length === 0) return;
-
-  const outDir = path.resolve(__dirname, '..', 'vault_trades_data');
-  fs.mkdirSync(outDir, { recursive: true });
-
-  log.info(`scraping trades for ${vaults.length} vaults...`);
-
-  for (const vault of vaults) {
-    await scrapeVault(vault, outDir);
-    await sleep(SLEEP_MS);
+  const minTvl = Number(process.env.VAULTS_TVL_MIN ?? 1000);
+  const targets = await loadVaultAddressesFromCsv(minTvl, -1, "normal");
+  if (targets.length === 0) {
+    log("warn", "no vaults found", {});
+    return;
   }
 
-  log.info('done');
+  const outDir = path.resolve("vault_trades_data");
+  fs.mkdirSync(outDir, { recursive: true });
+
+  const client = new HyperliquidClient();
+  log("info", `scraping trades for ${targets.length} vaults`, {});
+
+  for (const target of targets) {
+    try {
+      await scrapeVault(client, target.vaultAddress, target.createTimeMillis, outDir);
+    } catch (err: any) {
+      log("error", "trade scrape failed", {
+        vaultAddress: target.vaultAddress,
+        message: err.message,
+      });
+    }
+    await sleep(VAULT_SLEEP_MS);
+  }
+
+  log("info", "all trades done", {});
 }
 
 main().catch((err) => {
-  log.error(err);
+  log("error", "scrape-trades fatal", { message: (err as Error).message });
   process.exitCode = 1;
 });
