@@ -1,0 +1,50 @@
+
+============================================================
+SHORT GARBAGE STRATEGY — BACKTEST REPORT
+============================================================
+
+Period: 2025-07-15 → 2026-02-03 (204 days)
+Initial Capital: $100,000
+Final Equity:    $168,429
+
+── Performance ──────────────────────────────
+Total Return:     +68.4%
+Annual Return:    +154.2%
+Sharpe Ratio:     1.46
+Sortino Ratio:    2.51
+Calmar Ratio:     6.10
+
+── Risk ────────────────────────────────────
+Max Drawdown:     25.3%
+Max DD Duration:  68 days
+Avg Leverage:     1.00x
+Avg Positions:    20
+
+── Monthly ──────────────────────────────────
+Win Rate:         6/7 (86%)
+Best Month:       +28.8%
+Worst Month:      -7.7%
+Avg Month:        +8.1%
+
+── Costs ────────────────────────────────────
+Total Fees:       $7,744
+Total Funding:    $+0
+Fee Drag (ann.):  12.8%
+
+── Config ──────────────────────────────────
+N Shorts:         20
+Leverage:         1.0x
+Momentum Window:  14d
+Rebalance:        24h
+Max Position:     7%
+Fee Rate:         0.035%
+============================================================
+
+Monthly Returns:
+  2025-08:  -7.7%
+  2025-09:  +2.6%
+  2025-10:  +7.5%
+  2025-11: +10.4%
+  2025-12: +28.8%
+  2026-01: +14.3%
+  2026-02:  +0.4%
