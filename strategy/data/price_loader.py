@@ -1,4 +1,4 @@
-"""Load hourly price data from crypto_data/ directory."""
+"""Load price data from crypto_data/ directory."""
 import os
 from pathlib import Path
 
@@ -6,23 +6,10 @@ import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "crypto_data"
 
-# HL symbol → filename mapping overrides
-_SYMBOL_OVERRIDES = {
-    "kPEPE": "kpepeusdt_1h_hyperliquid.csv",
-    "kBONK": "kbonkusdt_1h_hyperliquid.csv",
-    "kSHIB": "kshibusdt_1h_hyperliquid.csv",
-    "kFLOKI": "kflokiusdt_1h_hyperliquid.csv",
-    "kLUNC": "kluncusdt_1h_hyperliquid.csv",
-    "kNEIRO": "kneirousdt_1h_hyperliquid.csv",
-}
 
-
-def load_coin(symbol: str, freq: str = "1h") -> pd.DataFrame:
+def load_coin(symbol: str, freq: str = "1d") -> pd.DataFrame:
     """Load price data for a single coin. Returns DataFrame with DatetimeIndex."""
-    filename = _SYMBOL_OVERRIDES.get(symbol)
-    if not filename:
-        filename = f"{symbol.lower()}usdt_{freq}_hyperliquid.csv"
-
+    filename = f"{symbol.lower()}usdt_{freq}_hyperliquid.csv"
     filepath = DATA_DIR / filename
     if not filepath.exists():
         raise FileNotFoundError(f"No price data for {symbol}: {filepath}")
@@ -34,21 +21,20 @@ def load_coin(symbol: str, freq: str = "1h") -> pd.DataFrame:
     return df
 
 
-def load_universe(min_days: int = 90) -> dict[str, pd.DataFrame]:
-    """Load all coins that have dense enough hourly data.
-
-    Selects coins with at least min_days of actual data points (not just date range).
-    """
+def load_universe(min_days: int = 365, freq: str = "1d") -> dict[str, pd.DataFrame]:
+    """Load all coins that have at least min_days of daily data."""
     universe = {}
+    suffix = f"_{freq}_hyperliquid.csv"
     for f in sorted(DATA_DIR.iterdir()):
-        if not f.name.endswith("_1h_hyperliquid.csv"):
+        if not f.name.endswith(suffix):
             continue
-        symbol = f.name.replace("usdt_1h_hyperliquid.csv", "").upper()
+        symbol = f.name.replace("usdt" + suffix.replace("usdt", ""), "").replace(suffix, "")
+        symbol = f.name[: -len(suffix)]
+        # Extract symbol: remove "usdt_1d_hyperliquid.csv" suffix
+        symbol = f.name.replace(f"usdt_{freq}_hyperliquid.csv", "").upper()
         try:
-            df = load_coin(symbol)
-            # Count actual data days (not just range)
-            actual_days = len(df["close"].resample("D").last().dropna())
-            if actual_days >= min_days:
+            df = load_coin(symbol, freq)
+            if len(df) >= min_days:
                 universe[symbol] = df
         except Exception:
             continue
@@ -56,15 +42,14 @@ def load_universe(min_days: int = 90) -> dict[str, pd.DataFrame]:
 
 
 def get_daily_closes(universe: dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """Convert hourly data to daily close prices. Returns coins as columns.
+    """Get daily close prices. For daily data, just extract close column.
 
     Finds the best common window where most coins have data.
     """
-    # Get daily close for each coin (only days with actual data)
     closes = {}
     for symbol, df in universe.items():
-        daily = df["close"].resample("D").last().dropna()
-        closes[symbol] = daily
+        # For daily data, close is already daily
+        closes[symbol] = df["close"]
 
     # Join into DataFrame
     result = pd.DataFrame(closes)
@@ -85,19 +70,22 @@ def get_daily_closes(universe: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     result = result.loc[best_idx]
 
-    # Keep columns with ≥60% data in this window
+    # Keep columns with ≥50% data in this window
     coverage = result.notna().sum() / len(result)
-    result = result.loc[:, coverage >= 0.6]
+    result = result.loc[:, coverage >= 0.5]
 
-    # Forward-fill gaps of up to 2 days within the window
-    result = result.ffill(limit=2)
+    # Forward-fill gaps of up to 3 days
+    result = result.ffill(limit=3)
 
     return result
 
 
 if __name__ == "__main__":
-    uni = load_universe(min_days=180)
-    print(f"Loaded {len(uni)} coins with ≥180 days of data")
+    uni = load_universe(min_days=365)
+    print(f"Loaded {len(uni)} coins with ≥365 days of data")
     closes = get_daily_closes(uni)
     print(f"Daily close matrix: {closes.shape}")
-    print(f"Date range: {closes.index[0]} → {closes.index[-1]}")
+    if len(closes) > 0:
+        print(f"Date range: {closes.index[0]} → {closes.index[-1]}")
+        print(f"NaN%: {closes.isna().sum().sum() / closes.size * 100:.1f}%")
+        print(f"BTC in universe: {'BTC' in closes.columns}")
