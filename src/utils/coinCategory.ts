@@ -9,10 +9,12 @@ const CATEGORIES: Record<string, string[]> = {
     'ALGO', 'ICP', 'HBAR', 'STX', 'XLM', 'XRP', 'ETC', 'LTC', 'BCH', 'BNB',
     'TRX', 'NEO', 'IOTA', 'CELO', 'MINA', 'CFX', 'SEI', 'TIA', 'MNT', 'TON',
     'KAS', 'S', 'MOVE', 'BERA', 'INIT', 'NIL', 'SOPH',
+    'MATIC', 'BSV', 'DYM', 'SAGA', 'ARK', 'IP',
   ],
   DeFi: [
     'AAVE', 'COMP', 'MKR', 'SNX', 'PENDLE', 'LDO', 'FXS', 'STG', 'RUNE', 'INJ',
     'CRV', 'JUP', 'ENA', 'ONDO', 'ETHFI', 'MORPHO', 'USUAL', 'CAKE',
+    'MAV', 'AERO', 'JTO', 'REZ', 'RSR', 'SYRUP',
   ],
   Meme: [
     'DOGE', 'KSHIB', 'KPEPE', 'KFLOKI', 'KLUNC', 'PEOPLE', 'KBONK', 'WIF',
@@ -23,19 +25,20 @@ const CATEGORIES: Record<string, string[]> = {
   'Gaming/NFT': [
     'AXS', 'SAND', 'IMX', 'GALA', 'YGG', 'APE', 'BLUR', 'ENS', 'GMT', 'WLD',
     'BIGTIME', 'XAI', 'SUPER', 'PIXEL', 'ACE',
+    'TNSR', 'ME',
   ],
   Infra: [
     'FIL', 'AR', 'FET', 'LINK', 'BLZ', 'OP', 'ARB', 'RENDER', 'IO', 'PYTH',
     'W', 'EIGEN', 'ZK', 'STRK', 'ZETA', 'LAYER', 'ZRO', 'MANTA', 'MERL',
     'ALT', 'POLYX', 'GAS', 'POL',
+    'HYPER', 'WCT', 'TRB', 'UMA',
   ],
   AI: [
     'AIXBT', 'VIRTUAL', 'GRASS', 'GRIFFAIN', 'TAO', 'KAITO', 'VVV',
   ],
   Other: [
-    'DASH', 'XMR', 'ZEC', 'ZEN', 'TRB', 'RSR', 'OGN', 'UMA', 'MAV', 'MATIC',
-    'PAXG', 'BSV', 'ORDI', 'DYM', 'SAGA', 'REZ', 'TNSR', 'BIO', 'ARK',
-    'AERO', 'BANANA', 'IP', 'JTO', 'HYPER', 'ME', 'SYRUP', 'WCT',
+    'DASH', 'XMR', 'ZEC', 'ZEN', 'OGN', 'PAXG', 'ORDI', 'BIO',
+    'BANANA',
   ],
 };
 
