@@ -29,4 +29,11 @@ crypto_data/
 vault_hl_pnl_daily/
 
 # Dashboard runtime
-dashboard/paper_trading.db__pycache__/
+dashboard/paper_trading.db
+__pycache__/
+
+# Claude IDE
+.claude/
+
+# Vault PnL data
+vault_hl_pnl/
