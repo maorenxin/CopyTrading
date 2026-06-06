@@ -32,6 +32,12 @@ def init_db():
             mode TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS nav_ticks (
+            ts TEXT PRIMARY KEY,
+            equity REAL NOT NULL,
+            unrealized_pnl REAL NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS positions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,

@@ -104,6 +104,18 @@ class PaperEngine:
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
 
+        # Persist tick to DB
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+        conn = db.get_db()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO nav_ticks (ts, equity, unrealized_pnl) VALUES (?, ?, ?)",
+                (ts, round(live_equity, 2), round(unrealized_pnl, 2))
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
     def get_live_nav(self) -> Optional[dict]:
         """Get latest live NAV computed from mark prices."""
         with self._nav_lock:
@@ -313,6 +325,11 @@ class PaperEngine:
             }
         finally:
             conn.close()
+            # Immediately update live NAV after rebalance
+            try:
+                self._update_live_nav()
+            except Exception:
+                pass
 
     def compute_metrics(self) -> dict:
         """Compute cumulative performance metrics."""

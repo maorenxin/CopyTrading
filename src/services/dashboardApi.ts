@@ -91,10 +91,17 @@ export interface StrategyConfig {
   rebalance_hour_utc: number;
 }
 
+export interface NavTick {
+  ts: string;
+  equity: number;
+  unrealized_pnl: number;
+}
+
 export const dashboardApi = {
   getStatus: () => fetchJSON<StrategyStatus>('/status'),
   getPositions: () => fetchJSON<Position[]>('/positions'),
   getHistory: (days = 365) => fetchJSON<DailySnapshot[]>(`/history?days=${days}`),
+  getNavTicks: () => fetchJSON<NavTick[]>('/nav_ticks'),
   getTrades: (days = 30) => fetchJSON<Trade[]>(`/trades?days=${days}`),
   getSignals: (date?: string) => fetchJSON<Signal[]>(date ? `/signals?date=${date}` : '/signals'),
   getMetrics: () => fetchJSON<Metrics>('/metrics'),

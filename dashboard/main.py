@@ -91,6 +91,19 @@ def trigger_rebalance(date: str = Query(default=None)):
     return result
 
 
+@app.get("/api/nav_ticks")
+def get_nav_ticks():
+    """Intraday NAV ticks (every 5 min)."""
+    conn = db.get_db()
+    try:
+        rows = conn.execute(
+            "SELECT ts, equity, unrealized_pnl FROM nav_ticks ORDER BY ts"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 @app.get("/api/config")
 def get_config():
     """Current strategy configuration."""
