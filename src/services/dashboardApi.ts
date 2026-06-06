@@ -107,6 +107,17 @@ export const dashboardApi = {
   getSignalDates: () => fetchJSON<string[]>('/signal_dates'),
   getMetrics: () => fetchJSON<Metrics>('/metrics'),
   getConfig: () => fetchJSON<StrategyConfig>('/config'),
+  updateConfig: async (patch: Partial<StrategyConfig>): Promise<StrategyConfig> => {
+    const res = await fetch(`${API_BASE}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      throw new Error(`API /config: ${res.status} ${res.statusText}`);
+    }
+    return res.json();
+  },
   triggerRebalance: (date?: string) =>
     fetch(`${API_BASE}/rebalance${date ? `?date=${date}` : ''}`, { method: 'POST' }).then(r => r.json()),
 };

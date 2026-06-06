@@ -35,6 +35,17 @@ def stop_scheduler():
         _scheduler = None
 
 
+def reschedule(hour: int):
+    """Re-point the daily rebalance job at a new UTC hour."""
+    if _scheduler is None:
+        return
+    _scheduler.reschedule_job(
+        "daily_rebalance",
+        trigger=CronTrigger(hour=hour, minute=5, timezone="UTC"),
+    )
+    logger.info(f"Rebalance rescheduled to UTC {hour:02d}:05")
+
+
 def _daily_rebalance(engine: PaperEngine):
     """Scheduled rebalance task."""
     try:

@@ -1,10 +1,13 @@
 """FastAPI dashboard backend."""
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+import json
 import logging
+from pathlib import Path
 
-from . import config, db
+from . import config, db, scheduler
 from .paper_engine import PaperEngine
 from .scheduler import start_scheduler, stop_scheduler
 
@@ -131,3 +134,55 @@ def get_config():
         "exclude_coins": config.EXCLUDE_COINS,
         "rebalance_hour_utc": config.REBALANCE_HOUR_UTC,
     }
+
+
+class ConfigUpdate(BaseModel):
+    """Editable strategy parameters. Only provided fields are updated."""
+    initial_capital: float | None = Field(default=None, gt=0)
+    n_long: int | None = Field(default=None, ge=1)
+    n_short: int | None = Field(default=None, ge=1)
+    leverage: float | None = Field(default=None, gt=0)
+    momentum_window: int | None = Field(default=None, ge=1)
+    fee_bps: float | None = Field(default=None, ge=0)
+    rebalance_hour_utc: int | None = Field(default=None, ge=0, le=23)
+
+
+# JSON key (lowercase) -> config module attribute (uppercase)
+_CONFIG_KEYS = {
+    "initial_capital": "INITIAL_CAPITAL",
+    "n_long": "N_LONG",
+    "n_short": "N_SHORT",
+    "leverage": "LEVERAGE",
+    "momentum_window": "MOMENTUM_WINDOW",
+    "fee_bps": "FEE_BPS",
+    "rebalance_hour_utc": "REBALANCE_HOUR_UTC",
+}
+_CONFIG_FILE = Path(__file__).with_name("config.json")
+
+
+@app.post("/api/config")
+def update_config(patch: ConfigUpdate):
+    """Update strategy parameters: apply in-memory + persist to config.json.
+
+    Changes take effect on the next rebalance; existing history is untouched.
+    """
+    updates = patch.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No parameters provided")
+
+    # Apply in-memory so the next rebalance picks them up.
+    for key, value in updates.items():
+        setattr(config, _CONFIG_KEYS[key], value)
+
+    # Persist: merge into config.json so changes survive a restart.
+    stored = {}
+    if _CONFIG_FILE.exists():
+        stored = json.loads(_CONFIG_FILE.read_text())
+    stored.update(updates)
+    _CONFIG_FILE.write_text(json.dumps(stored, indent=2))
+
+    # Reschedule the daily job if the rebalance hour changed.
+    if "rebalance_hour_utc" in updates:
+        scheduler.reschedule(updates["rebalance_hour_utc"])
+
+    return get_config()

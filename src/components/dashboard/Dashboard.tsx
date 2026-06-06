@@ -5,6 +5,7 @@ import { EquityCurve } from './EquityCurve';
 import { PositionsTable } from './PositionsTable';
 import { SignalRankings } from './SignalRankings';
 import { TradeLog } from './TradeLog';
+import { ConfigPanel } from './ConfigPanel';
 
 export function Dashboard() {
   const [status, setStatus] = useState<StrategyStatus | null>(null);
@@ -98,6 +99,7 @@ export function Dashboard() {
           >
             Rebalance Now
           </button>
+          <ConfigPanel />
         </div>
       </div>
 
