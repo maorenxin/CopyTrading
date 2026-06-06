@@ -7,14 +7,23 @@ interface Props {
 export function PositionsTable({ positions }: Props) {
   const shorts = positions.filter(p => p.side === 'short');
   const longs = positions.filter(p => p.side === 'long');
+  const totalPnl = positions.reduce((sum, p) => sum + (p.unrealized_pnl ?? 0), 0);
+  const pnlColor = totalPnl >= 0 ? '#00ff88' : '#ff4444';
 
   return (
     <div className="bg-[#0d1421] border border-[#1a2235] rounded-lg p-6 overflow-hidden">
-      <h2 className="text-[#00d4ff] font-semibold mb-4">
-        Current Positions
-        <span className="text-gray-500 text-sm font-normal ml-2">
-          ({longs.length}L / {shorts.length}S)
+      <h2 className="text-[#00d4ff] font-semibold mb-4 flex items-center justify-between">
+        <span>
+          Current Positions
+          <span className="text-gray-500 text-sm font-normal ml-2">
+            ({longs.length}L / {shorts.length}S)
+          </span>
         </span>
+        {positions.length > 0 && (
+          <span className="text-sm font-mono font-normal" style={{ color: pnlColor }}>
+            {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+          </span>
+        )}
       </h2>
 
       {positions.length === 0 ? (
