@@ -41,6 +41,27 @@ def load_universe(min_days: int = 365, freq: str = "1d") -> dict[str, pd.DataFra
     return universe
 
 
+def load_all_coins(min_days: int = 30, freq: str = "1d") -> dict[str, pd.DataFrame]:
+    """Load ALL coins with at least min_days of data (no strict filtering).
+
+    Unlike load_universe, this allows coins with short history (e.g. 30 days)
+    so they can be dynamically included once they have enough data for signal calc.
+    """
+    universe = {}
+    suffix = f"usdt_{freq}_hyperliquid.csv"
+    for f in sorted(DATA_DIR.iterdir()):
+        if not f.name.endswith(suffix):
+            continue
+        symbol = f.name.replace(suffix, "").upper()
+        try:
+            df = load_coin(symbol, freq)
+            if len(df) >= min_days:
+                universe[symbol] = df
+        except Exception:
+            continue
+    return universe
+
+
 def get_daily_closes(universe: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Get daily close prices. For daily data, just extract close column.
 
@@ -75,6 +96,36 @@ def get_daily_closes(universe: dict[str, pd.DataFrame]) -> pd.DataFrame:
     result = result.loc[:, coverage >= 0.5]
 
     # Forward-fill gaps of up to 3 days
+    result = result.ffill(limit=3)
+
+    return result
+
+
+def get_dynamic_closes(universe: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Get daily closes allowing dynamic coin entry.
+
+    Unlike get_daily_closes, this does NOT filter by coverage or find a 'best window'.
+    Coins appear as NaN before their listing date and have real prices after.
+    This allows the strategy to pick up new coins as soon as they have enough history.
+
+    Requires BTC to be present (used as the date index backbone).
+    """
+    closes = {}
+    for symbol, df in universe.items():
+        closes[symbol] = df["close"]
+
+    result = pd.DataFrame(closes)
+
+    # Use BTC's date range as backbone (longest history)
+    if "BTC" not in result.columns:
+        # fallback: use full date range
+        pass
+    else:
+        # Keep all dates where BTC has data
+        btc_mask = result["BTC"].notna()
+        result = result.loc[btc_mask]
+
+    # Forward-fill gaps up to 3 days (weekends, missing data)
     result = result.ffill(limit=3)
 
     return result
