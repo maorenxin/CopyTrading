@@ -11,11 +11,13 @@ type ViewMode = 'cumulative' | 'daily';
 export function EquityCurve({ history }: Props) {
   const [view, setView] = useState<ViewMode>('cumulative');
 
-  if (history.length === 0) {
+  if (history.length < 2) {
     return (
       <div className="bg-[#0d1421] border border-[#1a2235] rounded-lg p-6 overflow-hidden">
         <h2 className="text-[#00d4ff] font-semibold mb-4">Equity Curve</h2>
-        <div className="text-gray-500 text-center py-12">No data yet. Run a rebalance to start tracking.</div>
+        <div className="text-gray-500 text-center py-12">
+          Paper trading 已启动，累计 {history.length} 天数据。曲线将在 2 天后开始绘制。
+        </div>
       </div>
     );
   }
