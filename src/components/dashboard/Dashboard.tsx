@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { dashboardApi, StrategyStatus, DailySnapshot, Signal, Trade, Metrics } from '../../services/dashboardApi';
+import { dashboardApi, StrategyStatus, DailySnapshot, Trade, Metrics } from '../../services/dashboardApi';
 import { OverviewCards } from './OverviewCards';
 import { EquityCurve } from './EquityCurve';
 import { PositionsTable } from './PositionsTable';
@@ -9,7 +9,6 @@ import { TradeLog } from './TradeLog';
 export function Dashboard() {
   const [status, setStatus] = useState<StrategyStatus | null>(null);
   const [history, setHistory] = useState<DailySnapshot[]>([]);
-  const [signals, setSignals] = useState<Signal[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,16 +16,14 @@ export function Dashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const [s, h, sig, t, m] = await Promise.all([
+      const [s, h, t, m] = await Promise.all([
         dashboardApi.getStatus(),
         dashboardApi.getHistory(),
-        dashboardApi.getSignals(),
         dashboardApi.getTrades(),
         dashboardApi.getMetrics(),
       ]);
       setStatus(s);
       setHistory(h);
-      setSignals(sig);
       setTrades(t);
       setMetrics(m);
       setError(null);
@@ -113,7 +110,7 @@ export function Dashboard() {
       {/* Positions + Signals side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 [&>*]:min-h-0">
         <PositionsTable positions={status?.positions || []} />
-        <SignalRankings signals={signals} />
+        <SignalRankings />
       </div>
 
       {/* Trade log */}

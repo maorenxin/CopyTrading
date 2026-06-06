@@ -68,6 +68,19 @@ def get_trades(days: int = Query(default=30, ge=1, le=365)):
         conn.close()
 
 
+@app.get("/api/signal_dates")
+def get_signal_dates():
+    """List all dates that have signal data, newest first."""
+    conn = db.get_db()
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT date FROM daily_signals ORDER BY date DESC"
+        ).fetchall()
+        return [r["date"] for r in rows]
+    finally:
+        conn.close()
+
+
 @app.get("/api/signals")
 def get_signals(date: str = Query(default=None)):
     """Signal rankings for a given date (default: latest)."""

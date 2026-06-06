@@ -104,6 +104,7 @@ export const dashboardApi = {
   getNavTicks: () => fetchJSON<NavTick[]>('/nav_ticks'),
   getTrades: (days = 30) => fetchJSON<Trade[]>(`/trades?days=${days}`),
   getSignals: (date?: string) => fetchJSON<Signal[]>(date ? `/signals?date=${date}` : '/signals'),
+  getSignalDates: () => fetchJSON<string[]>('/signal_dates'),
   getMetrics: () => fetchJSON<Metrics>('/metrics'),
   getConfig: () => fetchJSON<StrategyConfig>('/config'),
   triggerRebalance: (date?: string) =>
