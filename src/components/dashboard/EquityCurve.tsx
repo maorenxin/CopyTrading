@@ -60,7 +60,7 @@ export function EquityCurve({ history }: Props) {
 
       {view === 'cumulative' ? (
         /* Cumulative equity line + Drawdown area */
-        <div className="h-[300px]">
+        <div style={{ height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1a2235" />
@@ -83,7 +83,7 @@ export function EquityCurve({ history }: Props) {
         </div>
       ) : (
         /* Daily PnL bars */
-        <div className="h-[300px]">
+        <div style={{ height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 5, right: 50, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1a2235" />
