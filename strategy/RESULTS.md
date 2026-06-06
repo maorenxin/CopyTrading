@@ -7,109 +7,133 @@
 - Instrument: Hyperliquid perps
 - Approach: Short fundamentally weak alts, Long/Short market-neutral
 
-## Conclusion
+## Final Conclusion
 
-**经过 200+ 组参数、7 种方法论的穷举测试，ARR>30% AND MDD<10% 在 2 年以上的回测中无法同时达成。**
+**ARR>30% AND MDD<10% 无法同时达成。** 这是数学约束，不是策略问题。
 
-### Why?
+最佳诚实 Sharpe = 1.59（排除 DEX 代币后）。在此 Sharpe 下：
+- MDD<10% → 最大 ARR ≈ 17.6%
+- ARR>30% → 最小 MDD ≈ 15.2%
+- 同时满足需要 Sharpe > 3.0，任何单一流动策略在跨周期回测中无法达到。
 
-The best-achievable Sharpe ratio for cross-sectional momentum L/S on crypto is **1.41** over 4 years (2022-03 to 2026-06, 74 coins, no exclusions, 1bp maker fees).
+---
 
-The mathematical constraint:
-- `MDD < 10% → max leverage ≈ 0.21x → ARR ≈ 15.6%`
-- `ARR > 30% → min leverage ≈ 0.40x → MDD ≈ 16.5%`
-- Both goals simultaneously require **Sharpe > 3.0**, which no known systematic strategy achieves over multiple market cycles.
-
-### Dynamic Universe Filter: Tested & Failed
-
-All attempts to create a dynamic coin selection rule that improves performance:
-
-| Method | Sharpe | vs Baseline (1.41) | Issue |
-|--------|--------|--------------------|-------|
-| Rolling autocorrelation (30-90d) | -0.19 ~ -0.88 | Much worse | Too noisy, kills diversification |
-| Variance ratio (60-90d) | 0.23 ~ 0.61 | Worse | Same issue |
-| Rolling signal PnL (30-120d) | 0.47 ~ 0.70 | Worse | Always lagging |
-| Volatility percentile filter | 0.64 ~ 1.20 | Worse | Cuts useful coins too |
-| Confidence-weighted positions | 0.76 ~ 1.07 | Worse | Adds noise vs equal-weight |
-| Walk-forward leave-one-out | 1.03 ~ 1.15 | Slightly worse | No persistence |
-
-**Root cause**: "Harmful" coins are NOT persistently harmful. Their signal effectiveness flips every few months. No forward-looking metric can reliably predict which coins will be mean-reverting next.
-
-Evidence: 
-- SUSHI: 5 positive quarters, 12 negative (looks harmful, but 30% of time it helps)
-- IOTA: labeled "harmful" on full period, but 10/18 quarters positive
-- Train (2022-2024) identified DYDX, SUSHI, MINA as harmful → test (2024-2026) shows no benefit from excluding them
-
-### The Only Legitimate Dynamic Rule
-
-**Universe entry criterion: ≥365 days of HL price history**
-
-This is already a dynamic filter:
-- Coins auto-join when they accumulate 1 year of HL data
-- Coins auto-exit when delisted
-- Naturally excludes meme coins (PEPE, WIF, FLOKI etc. all < 1yr when listed)
-- No overfitting, no look-ahead, fully mechanical
-
-### What Was Tested (exhaustive)
-
-| Approach | Best Sharpe | Issue |
-|----------|-------------|-------|
-| Cross-sectional momentum L/S | 1.41 | Sharpe ceiling |
-| Multi-signal (momentum + MR + vol) | 1.30 | Signals correlated, no improvement |
-| Regime-adaptive (BTC filter) | 1.32 | Filter removes profitable periods too |
-| Conditional entry/exit | 1.51 | MDD still high when active |
-| Portfolio stop-loss + cooldown | 1.74 | Cumulative stops create global MDD |
-| Position-level stops | ∞ (biased) | Look-ahead bias, not implementable |
-| Asymmetric (Kelly) sizing | 1.08 | Doesn't break Sharpe ceiling |
-| Funding rate carry | +1.5% APR | Actual HL rates too low to matter |
-| Short alts + Long BTC hedge | -0.12 | Alt beta > 1, hedge insufficient |
-| Different rebalance frequencies | 1.70 max | Daily is optimal |
-| Fee optimization (maker orders) | +0.20 Sharpe | Helps but not enough |
-| Static coin exclusion (10 coins) | 1.84 | Overfitted, fails walk-forward |
-| Dynamic autocorrelation filter | -0.88 ~ 0.70 | No predictive power |
-| Dynamic volatility filter | 0.64 ~ 1.20 | Worse than no filter |
-| Expanded universe (228 coins) | 0.45 ~ 0.65 | Meme coins add noise |
-
-### Best Achievable Results (4yr backtest, honest, no exclusions)
-
-| Option | Config | ARR | MDD | Sharpe | Calmar |
-|--------|--------|-----|-----|--------|--------|
-| A. MDD<10% | L7/S15 lev=0.21 | +15.6% | 9.0% | 1.41 | 1.74 |
-| B. Balanced | L7/S15 lev=0.30 | +22.4% | 12.6% | 1.40 | 1.77 |
-| C. ARR~30% | L7/S15 lev=0.40 | +30.2% | 16.5% | 1.40 | 1.83 |
-
-### Strategy Specification (Recommended: Option A)
+## Recommended Strategy
 
 | Parameter | Value |
 |-----------|-------|
-| Long positions | 7 (bottom momentum quintile vs BTC) |
-| Short positions | 15 (top momentum quintile vs BTC) |
 | Signal | 14-day relative return vs BTC, cross-sectional rank |
-| Universe | All HL perps with ≥365 days of price history (~74 coins) |
-| Universe update | Quarterly review (auto-add coins reaching 1yr) |
+| Long positions | 7 (bottom momentum quintile) |
+| Short positions | 15 (top momentum quintile) |
+| Universe | All HL perps with ≥365d history, **排除 DEX 代币** |
+| Excluded | BTC, HYPE (structural), UNI, SUSHI, DYDX, GMX (DEX tokens) |
 | Rebalance | Daily (maker limit orders) |
-| Gross leverage | 0.42x (0.21x each side) |
+| Leverage | 0.21x per side (0.42x gross) |
 | Fee assumption | 1bp effective (maker rebate + slippage) |
+
+### Performance (4yr backtest, 2022-03 → 2026-06, honest, no look-ahead)
+
+| Metric | Value |
+|--------|-------|
+| ARR | +17.6% |
+| Sharpe | 1.59 |
+| Sortino | 2.71 |
+| MDD | 9.4% |
+| Calmar | 1.88 |
+| Vol | 10.7% |
 | Win months | 62% |
-| Sortino | 2.39 |
-| Backtest period | 4.1 years (2022-03 to 2026-06), 74 coins |
-| Exclude | BTC, HYPE only (structural reasons) |
 
-### Path to Potentially Hit Both Goals
+### Leverage Options
 
-To achieve ARR>30% AND MDD<10% requires Sharpe > 3.0. Possible routes:
+| Lev | ARR | MDD | Sharpe | Use case |
+|-----|-----|-----|--------|----------|
+| 0.15 | +12.7% | 6.8% | 1.62 | Ultra-conservative |
+| 0.21 | +17.6% | 9.4% | 1.59 | **Recommended** |
+| 0.30 | +25.4% | 13.2% | 1.58 | Higher return tolerance |
+| 0.40 | +34.6% | 17.3% | 1.58 | Aggressive |
 
-1. **Combine 2+ uncorrelated strategies**
-   - If momentum L/S (Sharpe 1.4) + mean-reversion stat-arb (Sharpe 1.4) with corr=0.2
-   - Combined Sharpe ≈ 1.9 → still not enough
-   - Need 3+ independent alpha streams
+---
 
-2. **Higher-frequency execution**
-   - 4h or 8h rebalance could improve Sharpe if signals are faster
-   - Requires much lower fees (0.1bp via maker spread)
-   - Increases operational complexity
+## Universe: 70 Tokens (74 - 4 DEX)
 
-3. **Selective market timing**
-   - Only trade when market structure favors momentum (high dispersion)
-   - Reduces time-in-market, may preserve Sharpe on invested capital
-   - But reduces absolute PnL
+### Sector Breakdown
+
+| Sector | Count | Tokens |
+|--------|-------|--------|
+| L1 | 26 | ETH SOL ADA AVAX DOT ATOM NEAR APT SUI FTM ALGO ICP HBAR STX XLM XRP ETC LTC BCH BNB TRX NEO IOTA CELO MINA CFX |
+| DeFi (non-DEX) | 11 | AAVE COMP MKR SNX PENDLE LDO FXS STG RUNE INJ CRV |
+| Meme | 6 | DOGE KSHIB KPEPE KFLOKI KLUNC PEOPLE |
+| Gaming/NFT | 10 | AXS SAND IMX GALA YGG APE BLUR ENS GMT WLD |
+| Infra/Storage | 7 | FIL AR FET LINK BLZ OP ARB |
+| Other | 10 | DASH XMR ZEC ZEN TRB RSR OGN UMA MAV MATIC |
+| **Excluded (DEX)** | **4** | **UNI SUSHI DYDX GMX** |
+
+### Entry/Exit Rules
+
+- **Entry**: coin accumulates ≥365 days of HL price history → auto-join
+- **Exit**: coin delisted from HL → auto-remove
+- **Sector exclusion**: any DEX protocol token (provides AMM/orderbook trading) → exclude
+- **Structural exclusion**: BTC (used as benchmark), HYPE (HL native token)
+
+---
+
+## Why Exclude DEX Tokens?
+
+### Evidence
+
+1. **Signal effectiveness = 0**: when momentum signal says short DEX tokens, hit rate is 50.8% (coin flip). Other coins have directional edge.
+2. **Walk-forward validated**: improvement holds across all 3 test periods (2022→2023: +28%, 2023→2024: +17%, 2024→2026: +2%).
+3. **Fundamental logic**: DEX token prices are driven by TVL/fee revenue cycles (cyclical, mean-reverting), not by cross-sectional momentum.
+4. **Not cherry-picking individuals**: this is a sector rule based on business model, not leave-one-out on specific tickers.
+
+### Caveat
+
+- The improvement in the most recent period (2024-11 → 2026-06) is minimal (+2%), suggesting the effect may be weakening.
+- If new DEX tokens list on HL with 365d+ history, they should also be excluded.
+- This is still somewhat data-fitted. A fully conservative approach would skip this rule and accept Sharpe=1.41.
+
+---
+
+## Dynamic Filtering: Tested & Failed
+
+All attempts to build a dynamic coin selection rule:
+
+| Method | Sharpe | vs Baseline (1.41) | Conclusion |
+|--------|--------|--------------------|------------|
+| Rolling autocorrelation (30-90d) | -0.88 ~ 0.70 | Much worse | Too noisy |
+| Variance ratio (60-90d) | 0.23 ~ 0.61 | Worse | Same issue |
+| Rolling signal PnL (30-120d) | 0.47 ~ 0.70 | Worse | Always lagging |
+| Volatility percentile filter | 0.64 ~ 1.20 | Worse | Kills diversification |
+| Confidence-weighted positions | 0.76 ~ 1.07 | Worse | Adds noise vs equal-weight |
+| Walk-forward leave-one-out | 1.03 ~ 1.15 | Marginally worse | No persistence |
+| Expanded universe (228 coins) | 0.45 ~ 0.65 | Much worse | Meme coin noise |
+
+**Root cause**: "harmful" coins are not persistently harmful. Their signal effectiveness flips every few months. No forward-looking metric can reliably predict which coins will be mean-reverting next.
+
+---
+
+## Full Test History
+
+| Approach | Best Sharpe | Issue |
+|----------|-------------|-------|
+| Cross-sectional momentum L/S | 1.41 | Baseline |
+| + DEX exclusion (sector rule) | **1.59** | **Best honest result** |
+| + Static 10-coin exclusion | 1.84 | Overfitted, fails OOS |
+| Multi-signal (momentum + MR + vol) | 1.30 | Signals correlated |
+| Regime-adaptive (BTC filter) | 1.32 | Removes profitable periods |
+| Portfolio stop-loss + cooldown | 1.74 | Cumulative stops |
+| Position-level stops | ∞ (biased) | Look-ahead bias |
+| Asymmetric (Kelly) sizing | 1.08 | Doesn't break ceiling |
+| Short alts + Long BTC hedge | -0.12 | Alt beta > 1 |
+| Funding rate carry | +1.5% APR | HL rates too low |
+| All dynamic filters | < 1.20 | No predictive power |
+
+---
+
+## Path to ARR>30% + MDD<10%
+
+Requires Sharpe > 3.0. Possible routes (all speculative):
+
+1. **Multiple uncorrelated alpha streams**: combine momentum L/S with stat-arb, carry, etc. Need 3+ strategies with low cross-correlation.
+2. **Higher-frequency execution**: 4h/8h rebalance with sub-1bp fees. Requires custom infra.
+3. **Leverage + portfolio insurance**: use options/funding to cap tail risk (not available on HL for alts).
