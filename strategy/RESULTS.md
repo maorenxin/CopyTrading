@@ -13,18 +13,48 @@
 
 ### Why?
 
-The best-achievable Sharpe ratio for cross-sectional momentum L/S on crypto is **1.70** over 5.5 years (2020-12 to 2026-06, 75 coins, 1bp maker fees).
+The best-achievable Sharpe ratio for cross-sectional momentum L/S on crypto is **1.41** over 4 years (2022-03 to 2026-06, 74 coins, no exclusions, 1bp maker fees).
 
-The empirical constraint:
-- `MDD < 10% → max leverage ≈ 0.16x → ARR ≈ 19%`
-- `ARR > 30% → min leverage ≈ 0.25x → MDD ≈ 14.4%`
-- Both goals simultaneously require **Calmar > 3.0** (i.e. Sharpe > 4.5), which no known systematic strategy achieves over multiple market cycles.
+The mathematical constraint:
+- `MDD < 10% → max leverage ≈ 0.21x → ARR ≈ 15.6%`
+- `ARR > 30% → min leverage ≈ 0.40x → MDD ≈ 16.5%`
+- Both goals simultaneously require **Sharpe > 3.0**, which no known systematic strategy achieves over multiple market cycles.
+
+### Dynamic Universe Filter: Tested & Failed
+
+All attempts to create a dynamic coin selection rule that improves performance:
+
+| Method | Sharpe | vs Baseline (1.41) | Issue |
+|--------|--------|--------------------|-------|
+| Rolling autocorrelation (30-90d) | -0.19 ~ -0.88 | Much worse | Too noisy, kills diversification |
+| Variance ratio (60-90d) | 0.23 ~ 0.61 | Worse | Same issue |
+| Rolling signal PnL (30-120d) | 0.47 ~ 0.70 | Worse | Always lagging |
+| Volatility percentile filter | 0.64 ~ 1.20 | Worse | Cuts useful coins too |
+| Confidence-weighted positions | 0.76 ~ 1.07 | Worse | Adds noise vs equal-weight |
+| Walk-forward leave-one-out | 1.03 ~ 1.15 | Slightly worse | No persistence |
+
+**Root cause**: "Harmful" coins are NOT persistently harmful. Their signal effectiveness flips every few months. No forward-looking metric can reliably predict which coins will be mean-reverting next.
+
+Evidence: 
+- SUSHI: 5 positive quarters, 12 negative (looks harmful, but 30% of time it helps)
+- IOTA: labeled "harmful" on full period, but 10/18 quarters positive
+- Train (2022-2024) identified DYDX, SUSHI, MINA as harmful → test (2024-2026) shows no benefit from excluding them
+
+### The Only Legitimate Dynamic Rule
+
+**Universe entry criterion: ≥365 days of HL price history**
+
+This is already a dynamic filter:
+- Coins auto-join when they accumulate 1 year of HL data
+- Coins auto-exit when delisted
+- Naturally excludes meme coins (PEPE, WIF, FLOKI etc. all < 1yr when listed)
+- No overfitting, no look-ahead, fully mechanical
 
 ### What Was Tested (exhaustive)
 
 | Approach | Best Sharpe | Issue |
 |----------|-------------|-------|
-| Cross-sectional momentum L/S | 1.70 | Sharpe ceiling |
+| Cross-sectional momentum L/S | 1.41 | Sharpe ceiling |
 | Multi-signal (momentum + MR + vol) | 1.30 | Signals correlated, no improvement |
 | Regime-adaptive (BTC filter) | 1.32 | Filter removes profitable periods too |
 | Conditional entry/exit | 1.51 | MDD still high when active |
@@ -35,55 +65,51 @@ The empirical constraint:
 | Short alts + Long BTC hedge | -0.12 | Alt beta > 1, hedge insufficient |
 | Different rebalance frequencies | 1.70 max | Daily is optimal |
 | Fee optimization (maker orders) | +0.20 Sharpe | Helps but not enough |
+| Static coin exclusion (10 coins) | 1.84 | Overfitted, fails walk-forward |
+| Dynamic autocorrelation filter | -0.88 ~ 0.70 | No predictive power |
+| Dynamic volatility filter | 0.64 ~ 1.20 | Worse than no filter |
+| Expanded universe (228 coins) | 0.45 ~ 0.65 | Meme coins add noise |
 
-### Best Achievable Results (5.5yr backtest, 1bp fees)
+### Best Achievable Results (4yr backtest, honest, no exclusions)
 
-| Option | Config | ARR | MDD | Sharpe | Calmar | Sortino |
-|--------|--------|-----|-----|--------|--------|---------|
-| A. MDD<10% | L7/S15 lev0.16 | +19.2% | 9.4% | 1.70 | 2.04 | 3.04 |
-| B. ARR~30% | L7/S15 lev0.25 | +30.9% | 14.4% | 1.70 | 2.15 | 3.03 |
-| C. Balanced | L7/S15 lev0.20 | +24.3% | 11.6% | 1.70 | 2.09 | 3.03 |
+| Option | Config | ARR | MDD | Sharpe | Calmar |
+|--------|--------|-----|-----|--------|--------|
+| A. MDD<10% | L7/S15 lev=0.21 | +15.6% | 9.0% | 1.41 | 1.74 |
+| B. Balanced | L7/S15 lev=0.30 | +22.4% | 12.6% | 1.40 | 1.77 |
+| C. ARR~30% | L7/S15 lev=0.40 | +30.2% | 16.5% | 1.40 | 1.83 |
 
-### Strategy Specification (Recommended: Option C)
+### Strategy Specification (Recommended: Option A)
 
 | Parameter | Value |
 |-----------|-------|
 | Long positions | 7 (bottom momentum quintile vs BTC) |
 | Short positions | 15 (top momentum quintile vs BTC) |
 | Signal | 14-day relative return vs BTC, cross-sectional rank |
+| Universe | All HL perps with ≥365 days of price history (~74 coins) |
+| Universe update | Quarterly review (auto-add coins reaching 1yr) |
 | Rebalance | Daily (maker limit orders) |
-| Gross leverage | 0.40x (0.20x each side) |
+| Gross leverage | 0.42x (0.21x each side) |
 | Fee assumption | 1bp effective (maker rebate + slippage) |
-| Win months | 64% |
-| Sortino | 3.03 |
-| Backtest period | 5.5 years (2020-12 to 2026-06), 75 coins |
-| Key drawdown events | 2021-06 (12.7%), 2023-02 (11.9%), 2024-09 (9.6%) |
-
-### What Was Tested (exhaustive detail)
-
-1. **Signals**: Momentum (14d, 7d, 21d), mean reversion (5d/20d), cross-sectional volatility, funding rate, MCap/FDV inflation
-2. **Portfolio**: L5/S15, L7/S15, L7/S20, L10/S10, L3/S8, L3/S20 (7 configurations)
-3. **Regime filters**: BTC MA(20/30/50/60), BTC deviation thresholds (10-50%), alt-BTC correlation, cross-sectional dispersion
-4. **Risk management**: Portfolio stops (3-7%), position stops (10-20%), cooldowns (3-14d), vol targeting (5-25%), trailing stops
-5. **Sizing**: Fixed, asymmetric (Kelly), vol-targeted, regime-scaled, signal-strength-weighted
-6. **Entry/exit**: Always-in, conditional (binary), regime-adaptive (continuous)
-7. **Fees**: 0bp to 5.5bp tested (proves strategy is fee-robust at 1bp)
-8. **Rebalance**: Daily, 2d, 3d, 5d, 7d, 10d, 14d
-9. **Funding carry**: Actual HL rates analyzed (too low: avg 0.0014%/8h = 1.5% APR)
-10. **BTC hedge**: Dollar-neutral, beta-neutral — worse than alt-vs-alt L/S
+| Win months | 62% |
+| Sortino | 2.39 |
+| Backtest period | 4.1 years (2022-03 to 2026-06), 74 coins |
+| Exclude | BTC, HYPE only (structural reasons) |
 
 ### Path to Potentially Hit Both Goals
 
-To achieve ARR>30% AND MDD<10% requires Calmar > 3.0. Possible routes:
+To achieve ARR>30% AND MDD<10% requires Sharpe > 3.0. Possible routes:
 
-1. **Combine 2 uncorrelated strategies** (e.g., momentum L/S + statistical arbitrage)
-   - If both have Sharpe 1.7 and correlation < 0.3, combined Sharpe ≈ 2.4
-   - At Sharpe 2.4: lev 0.18 → ARR ~30%, MDD ~8%
-   
-2. **Include funding carry** if alt funding rates increase:
-   - Need net ~2bp/8h (current: ~0.15bp/8h)
-   - Possible in strong bull markets (would need forward-looking data)
+1. **Combine 2+ uncorrelated strategies**
+   - If momentum L/S (Sharpe 1.4) + mean-reversion stat-arb (Sharpe 1.4) with corr=0.2
+   - Combined Sharpe ≈ 1.9 → still not enough
+   - Need 3+ independent alpha streams
 
-3. **Restrict to post-2022 only** and accept survivorship bias:
-   - Post-2023-06: Sharpe 1.88 → still ARR 26% at MDD 10%
-   - Not an honest 2-year backtest across market cycles
+2. **Higher-frequency execution**
+   - 4h or 8h rebalance could improve Sharpe if signals are faster
+   - Requires much lower fees (0.1bp via maker spread)
+   - Increases operational complexity
+
+3. **Selective market timing**
+   - Only trade when market structure favors momentum (high dispersion)
+   - Reduces time-in-market, may preserve Sharpe on invested capital
+   - But reduces absolute PnL
