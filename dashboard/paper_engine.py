@@ -1,9 +1,15 @@
 """Paper trading engine — manages positions, rebalance, and PnL tracking."""
 import sqlite3
+import time
+import threading
+import logging
 from datetime import date, datetime, timezone
 from typing import Optional
 
 from . import config, db, signal
+from .price_feed import fetch_mark_prices
+
+logger = logging.getLogger(__name__)
 
 
 class PaperEngine:
@@ -11,39 +17,144 @@ class PaperEngine:
 
     def __init__(self):
         db.init_db()
+        self._live_nav: Optional[dict] = None
+        self._nav_lock = threading.Lock()
+        self._start_price_feed()
+
+    def _start_price_feed(self):
+        """Start background thread to update NAV every 5 minutes."""
+        # Run first update synchronously to have data immediately
+        try:
+            self._update_live_nav()
+        except Exception:
+            pass
+        self._feed_thread = threading.Thread(target=self._price_feed_loop, daemon=True)
+        self._feed_thread.start()
+
+    def _price_feed_loop(self):
+        """Fetch mark prices every 5 min, compute live NAV."""
+        while True:
+            try:
+                self._update_live_nav()
+            except Exception as e:
+                logger.error(f"Price feed error: {e}")
+            time.sleep(300)  # 5 minutes
+
+    def _update_live_nav(self):
+        """Compute live NAV from current positions + mark prices."""
+        conn = db.get_db()
+        try:
+            positions = db.get_current_positions(conn)
+            snapshot = db.get_latest_snapshot(conn)
+        finally:
+            conn.close()
+
+        if not positions or not snapshot:
+            return
+
+        prices = fetch_mark_prices()
+        if not prices:
+            return
+
+        # Calculate unrealized PnL from mark prices
+        base_equity = snapshot["equity"]
+        unrealized_pnl = 0.0
+        position_details = []
+
+        for pos in positions:
+            coin = pos["coin"]
+            entry_price = pos["entry_price"]
+            notional = pos["notional"]
+            mark_price = prices.get(coin)
+
+            if mark_price is None or entry_price <= 0:
+                position_details.append({**pos, "mark_price": None, "unrealized_pnl": 0})
+                continue
+
+            # PnL = notional * (mark/entry - 1)
+            # For short: notional is negative, so if price goes up, PnL is negative (correct)
+            pnl = notional * (mark_price / entry_price - 1)
+            unrealized_pnl += pnl
+            position_details.append({
+                **pos,
+                "mark_price": mark_price,
+                "unrealized_pnl": round(pnl, 2),
+            })
+
+        live_equity = base_equity + unrealized_pnl
+        peak = max(base_equity, live_equity)  # simplified peak for intraday
+
+        # Get historical peak from snapshots
+        conn = db.get_db()
+        try:
+            peak_row = conn.execute("SELECT MAX(equity) as peak FROM daily_snapshots").fetchone()
+            if peak_row and peak_row["peak"]:
+                peak = max(peak, peak_row["peak"])
+        finally:
+            conn.close()
+
+        drawdown = (peak - live_equity) / peak if peak > 0 else 0
+
+        with self._nav_lock:
+            self._live_nav = {
+                "equity": round(live_equity, 2),
+                "unrealized_pnl": round(unrealized_pnl, 2),
+                "drawdown": round(drawdown, 6),
+                "positions": position_details,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+    def get_live_nav(self) -> Optional[dict]:
+        """Get latest live NAV computed from mark prices."""
+        with self._nav_lock:
+            return self._live_nav
 
     def get_state(self) -> dict:
-        """Get current portfolio state."""
+        """Get current portfolio state with live NAV if available."""
         conn = db.get_db()
         try:
             snapshot = db.get_latest_snapshot(conn)
             positions = db.get_current_positions(conn)
-            if snapshot:
-                return {
-                    "mode": config.MODE,
-                    "equity": snapshot["equity"],
-                    "daily_pnl": snapshot["daily_pnl"],
-                    "cumulative_pnl": snapshot["cumulative_pnl"],
-                    "drawdown": snapshot["drawdown"],
-                    "leverage": snapshot["leverage"],
-                    "positions": positions,
-                    "last_rebalance": snapshot["date"],
-                    "running_days": self._count_days(conn),
-                }
-            else:
-                return {
-                    "mode": config.MODE,
-                    "equity": config.INITIAL_CAPITAL,
-                    "daily_pnl": 0,
-                    "cumulative_pnl": 0,
-                    "drawdown": 0,
-                    "leverage": 0,
-                    "positions": [],
-                    "last_rebalance": None,
-                    "running_days": 0,
-                }
+            running_days = conn.execute("SELECT COUNT(*) as n FROM daily_snapshots").fetchone()["n"]
         finally:
             conn.close()
+
+        live = self.get_live_nav()
+
+        if snapshot:
+            equity = live["equity"] if live else snapshot["equity"]
+            unrealized = live["unrealized_pnl"] if live else 0
+            dd = live["drawdown"] if live else snapshot["drawdown"]
+            pos_data = live["positions"] if live else positions
+            return {
+                "mode": config.MODE,
+                "equity": equity,
+                "daily_pnl": unrealized,
+                "cumulative_pnl": equity - config.INITIAL_CAPITAL,
+                "drawdown": dd,
+                "leverage": snapshot["leverage"],
+                "positions": pos_data,
+                "last_rebalance": snapshot["date"],
+                "running_days": running_days,
+                "nav_updated_at": live["updated_at"] if live else None,
+            }
+        else:
+            return {
+                "mode": config.MODE,
+                "equity": config.INITIAL_CAPITAL,
+                "daily_pnl": 0,
+                "cumulative_pnl": 0,
+                "drawdown": 0,
+                "leverage": 0,
+                "positions": [],
+                "last_rebalance": None,
+                "running_days": 0,
+                "nav_updated_at": None,
+            }
+
+    def _count_days_from_snapshot(self, snapshot, conn):
+        row = conn.execute("SELECT COUNT(*) as n FROM daily_snapshots").fetchone()
+        return row["n"] if row else 0
 
     def rebalance(self, force_date: Optional[str] = None) -> dict:
         """Execute daily rebalance: compute signals, update positions, record trades."""
@@ -202,10 +313,6 @@ class PaperEngine:
             }
         finally:
             conn.close()
-
-    def _count_days(self, conn: sqlite3.Connection) -> int:
-        row = conn.execute("SELECT COUNT(*) as n FROM daily_snapshots").fetchone()
-        return row["n"] if row else 0
 
     def compute_metrics(self) -> dict:
         """Compute cumulative performance metrics."""

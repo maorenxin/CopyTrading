@@ -91,7 +91,9 @@ export function Dashboard() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500">
-            Last rebalance: {status?.last_rebalance || 'Never'}
+            {status?.nav_updated_at
+              ? `NAV: ${new Date(status.nav_updated_at).toLocaleTimeString()}`
+              : `Last rebalance: ${status?.last_rebalance || 'Never'}`}
           </span>
           <button
             onClick={handleRebalance}

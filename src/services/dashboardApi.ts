@@ -22,6 +22,7 @@ export interface StrategyStatus {
   positions: Position[];
   last_rebalance: string | null;
   running_days: number;
+  nav_updated_at: string | null;
 }
 
 export interface Position {
@@ -33,6 +34,8 @@ export interface Position {
   entry_price: number;
   signal_score: number;
   daily_pnl: number;
+  mark_price?: number | null;
+  unrealized_pnl?: number;
 }
 
 export interface DailySnapshot {

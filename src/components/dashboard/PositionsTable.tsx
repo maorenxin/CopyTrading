@@ -28,7 +28,8 @@ export function PositionsTable({ positions }: Props) {
                 <th className="text-left py-2 px-2">Side</th>
                 <th className="text-right py-2 px-2">Notional</th>
                 <th className="text-right py-2 px-2">Entry</th>
-                <th className="text-right py-2 px-2">Score</th>
+                <th className="text-right py-2 px-2">Mark</th>
+                <th className="text-right py-2 px-2">PnL</th>
               </tr>
             </thead>
             <tbody>
@@ -38,7 +39,7 @@ export function PositionsTable({ positions }: Props) {
               ))}
               {/* Divider */}
               {shorts.length > 0 && longs.length > 0 && (
-                <tr><td colSpan={5} className="border-t border-[#1a2235]" /></tr>
+                <tr><td colSpan={6} className="border-t border-[#1a2235]" /></tr>
               )}
               {/* Longs */}
               {longs.map(pos => (
@@ -54,6 +55,10 @@ export function PositionsTable({ positions }: Props) {
 
 function PositionRow({ pos }: { pos: Position }) {
   const sideColor = pos.side === 'short' ? '#ff4444' : '#00ff88';
+  const pnl = pos.unrealized_pnl ?? 0;
+  const pnlColor = pnl >= 0 ? '#00ff88' : '#ff4444';
+  const markPrice = pos.mark_price;
+
   return (
     <tr className="border-t border-[#1a2235]/50 hover:bg-[#1a2235]/30">
       <td className="py-1.5 px-2 font-mono text-white">{pos.coin}</td>
@@ -66,11 +71,20 @@ function PositionRow({ pos }: { pos: Position }) {
         ${Math.abs(pos.notional).toFixed(0)}
       </td>
       <td className="py-1.5 px-2 text-right font-mono text-gray-400">
-        {pos.entry_price > 0 ? `$${pos.entry_price.toFixed(pos.entry_price < 1 ? 5 : 2)}` : '—'}
+        {pos.entry_price > 0 ? formatPrice(pos.entry_price) : '—'}
       </td>
-      <td className="py-1.5 px-2 text-right font-mono text-gray-400">
-        {(pos.signal_score * 100).toFixed(1)}
+      <td className="py-1.5 px-2 text-right font-mono text-gray-300">
+        {markPrice ? formatPrice(markPrice) : '—'}
+      </td>
+      <td className="py-1.5 px-2 text-right font-mono" style={{ color: pnlColor }}>
+        {pnl !== 0 ? `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}` : '—'}
       </td>
     </tr>
   );
+}
+
+function formatPrice(p: number): string {
+  if (p >= 100) return `$${p.toFixed(2)}`;
+  if (p >= 1) return `$${p.toFixed(3)}`;
+  return `$${p.toFixed(5)}`;
 }
