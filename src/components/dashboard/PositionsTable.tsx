@@ -9,7 +9,7 @@ export function PositionsTable({ positions }: Props) {
   const longs = positions.filter(p => p.side === 'long');
 
   return (
-    <div className="bg-[#0d1421] border border-[#1a2235] rounded-lg p-6">
+    <div className="bg-[#0d1421] border border-[#1a2235] rounded-lg p-6 overflow-hidden">
       <h2 className="text-[#00d4ff] font-semibold mb-4">
         Current Positions
         <span className="text-gray-500 text-sm font-normal ml-2">
@@ -20,7 +20,7 @@ export function PositionsTable({ positions }: Props) {
       {positions.length === 0 ? (
         <div className="text-gray-500 text-center py-8">No positions yet</div>
       ) : (
-        <div className="overflow-auto max-h-[400px]">
+        <div className="overflow-auto max-h-[350px]">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-[#0d1421]">
               <tr className="text-gray-500 text-xs uppercase">

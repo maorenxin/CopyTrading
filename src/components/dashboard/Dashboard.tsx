@@ -109,7 +109,7 @@ export function Dashboard() {
       <EquityCurve history={history} />
 
       {/* Positions + Signals side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 [&>*]:min-h-0">
         <PositionsTable positions={status?.positions || []} />
         <SignalRankings signals={signals} />
       </div>
