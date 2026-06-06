@@ -1,0 +1,76 @@
+import { Position } from '../../services/dashboardApi';
+
+interface Props {
+  positions: Position[];
+}
+
+export function PositionsTable({ positions }: Props) {
+  const shorts = positions.filter(p => p.side === 'short');
+  const longs = positions.filter(p => p.side === 'long');
+
+  return (
+    <div className="bg-[#0d1421] border border-[#1a2235] rounded-lg p-6">
+      <h2 className="text-[#00d4ff] font-semibold mb-4">
+        Current Positions
+        <span className="text-gray-500 text-sm font-normal ml-2">
+          ({longs.length}L / {shorts.length}S)
+        </span>
+      </h2>
+
+      {positions.length === 0 ? (
+        <div className="text-gray-500 text-center py-8">No positions yet</div>
+      ) : (
+        <div className="overflow-auto max-h-[400px]">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-[#0d1421]">
+              <tr className="text-gray-500 text-xs uppercase">
+                <th className="text-left py-2 px-2">Coin</th>
+                <th className="text-left py-2 px-2">Side</th>
+                <th className="text-right py-2 px-2">Notional</th>
+                <th className="text-right py-2 px-2">Entry</th>
+                <th className="text-right py-2 px-2">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Shorts first */}
+              {shorts.map(pos => (
+                <PositionRow key={pos.id} pos={pos} />
+              ))}
+              {/* Divider */}
+              {shorts.length > 0 && longs.length > 0 && (
+                <tr><td colSpan={5} className="border-t border-[#1a2235]" /></tr>
+              )}
+              {/* Longs */}
+              {longs.map(pos => (
+                <PositionRow key={pos.id} pos={pos} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PositionRow({ pos }: { pos: Position }) {
+  const sideColor = pos.side === 'short' ? '#ff4444' : '#00ff88';
+  return (
+    <tr className="border-t border-[#1a2235]/50 hover:bg-[#1a2235]/30">
+      <td className="py-1.5 px-2 font-mono text-white">{pos.coin}</td>
+      <td className="py-1.5 px-2">
+        <span className="text-xs font-semibold uppercase" style={{ color: sideColor }}>
+          {pos.side}
+        </span>
+      </td>
+      <td className="py-1.5 px-2 text-right font-mono text-gray-300">
+        ${Math.abs(pos.notional).toFixed(0)}
+      </td>
+      <td className="py-1.5 px-2 text-right font-mono text-gray-400">
+        {pos.entry_price > 0 ? `$${pos.entry_price.toFixed(pos.entry_price < 1 ? 5 : 2)}` : '—'}
+      </td>
+      <td className="py-1.5 px-2 text-right font-mono text-gray-400">
+        {(pos.signal_score * 100).toFixed(1)}
+      </td>
+    </tr>
+  );
+}
