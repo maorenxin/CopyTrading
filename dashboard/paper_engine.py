@@ -19,6 +19,11 @@ class PaperEngine:
         db.init_db()
         self._live_nav: Optional[dict] = None
         self._nav_lock = threading.Lock()
+        # Fill any days missed while the process was down, then start the feed.
+        try:
+            self.backfill()
+        except Exception as e:
+            logger.error(f"Startup backfill failed: {e}", exc_info=True)
         self._start_price_feed()
 
     def _start_price_feed(self):
@@ -147,6 +152,7 @@ class PaperEngine:
                 "leverage": snapshot["leverage"],
                 "positions": pos_data,
                 "last_rebalance": snapshot["date"],
+                "last_rebalance_at": snapshot["rebalanced_at"] if "rebalanced_at" in snapshot.keys() else None,
                 "running_days": running_days,
                 "nav_updated_at": live["updated_at"] if live else None,
             }
@@ -168,9 +174,17 @@ class PaperEngine:
         row = conn.execute("SELECT COUNT(*) as n FROM daily_snapshots").fetchone()
         return row["n"] if row else 0
 
-    def rebalance(self, force_date: Optional[str] = None) -> dict:
-        """Execute daily rebalance: compute signals, update positions, record trades."""
+    def rebalance(self, force_date: Optional[str] = None,
+                  rebalanced_at: Optional[str] = None) -> dict:
+        """Execute daily rebalance: compute signals, update positions, record trades.
+
+        `rebalanced_at` is the wall-clock timestamp the rebalance ran. For a
+        real-time run it defaults to now; backfilled historical days pass an
+        explicit value (or None) so the UI can tell them apart.
+        """
         today = force_date or date.today().isoformat()
+        if rebalanced_at is None and force_date is None:
+            rebalanced_at = datetime.now(timezone.utc).isoformat()
 
         conn = db.get_db()
         try:
@@ -181,11 +195,11 @@ class PaperEngine:
             if existing:
                 return {"status": "skipped", "reason": f"Already rebalanced on {today}"}
 
-            # Load prices and compute signal
+            # Load prices and compute signal as of `today`
             closes = signal.load_daily_closes()
-            scores = signal.compute_momentum_signal(closes)
+            scores = signal.compute_momentum_signal(closes, as_of_date=today)
             short_coins, long_coins = signal.select_portfolio(scores)
-            prices = signal.get_latest_prices(closes)
+            prices = signal.get_latest_prices(closes, as_of_date=today)
 
             # Get previous equity
             prev_snapshot = db.get_latest_snapshot(conn)
@@ -199,18 +213,12 @@ class PaperEngine:
             if peak_row and peak_row["peak"]:
                 peak_equity = max(peak_equity, peak_row["peak"])
 
-            # Calculate PnL from previous positions
+            # Calculate PnL from previous positions using `today`'s close-to-close return
             prev_positions = db.get_current_positions(conn)
             daily_pnl = 0.0
             for pos in prev_positions:
-                coin = pos["coin"]
-                if coin in closes.columns:
-                    # Get today's return
-                    coin_closes = closes[coin].dropna()
-                    if len(coin_closes) >= 2:
-                        ret = (coin_closes.iloc[-1] - coin_closes.iloc[-2]) / coin_closes.iloc[-2]
-                        pnl = pos["notional"] * ret
-                        daily_pnl += pnl
+                ret = signal.get_daily_return(closes, pos["coin"], as_of_date=today)
+                daily_pnl += pos["notional"] * ret
 
             equity += daily_pnl
 
@@ -276,10 +284,10 @@ class PaperEngine:
             # Persist to DB
             conn.execute(
                 """INSERT INTO daily_snapshots
-                   (date, equity, daily_pnl, cumulative_pnl, drawdown, leverage, n_longs, n_shorts, fees, mode)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (date, equity, daily_pnl, cumulative_pnl, drawdown, leverage, n_longs, n_shorts, fees, mode, rebalanced_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (today, equity, daily_pnl, cumulative_pnl, drawdown,
-                 actual_leverage, len(long_coins), len(short_coins), total_fees, config.MODE)
+                 actual_leverage, len(long_coins), len(short_coins), total_fees, config.MODE, rebalanced_at)
             )
 
             for pos in new_positions:
@@ -330,6 +338,38 @@ class PaperEngine:
                 self._update_live_nav()
             except Exception:
                 pass
+
+    def backfill(self) -> dict:
+        """Run rebalance for every trading day between the last snapshot and the
+        latest price data that has no snapshot yet. Each day uses that day's real
+        prices/signal, so the reconstructed history is genuine (not the latest
+        day repeated).
+
+        Requires an existing baseline snapshot — we never reconstruct history
+        from scratch (the strategy's starting point is the first manual/scheduled
+        rebalance, not the earliest price data)."""
+        conn = db.get_db()
+        try:
+            last = db.get_latest_snapshot(conn)
+        finally:
+            conn.close()
+
+        if not last:
+            return {"backfilled": [], "reason": "no baseline snapshot yet"}
+
+        closes = signal.load_daily_closes()
+        missing = signal.available_dates(closes, after=last["date"])
+        if not missing:
+            return {"backfilled": []}
+
+        logger.info(f"Backfilling {len(missing)} missed day(s): {missing[0]}..{missing[-1]}")
+        done = []
+        for d in missing:
+            result = self.rebalance(force_date=d, rebalanced_at=None)
+            if result.get("status") == "ok":
+                done.append(d)
+        logger.info(f"Backfill complete: {len(done)} day(s) added")
+        return {"backfilled": done}
 
     def compute_metrics(self) -> dict:
         """Compute cumulative performance metrics."""

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { dashboardApi, StrategyStatus, DailySnapshot, Trade, Metrics } from '../../services/dashboardApi';
+import { dashboardApi, StrategyStatus, DailySnapshot, Trade, Metrics, StrategyConfig } from '../../services/dashboardApi';
 import { OverviewCards } from './OverviewCards';
 import { EquityCurve } from './EquityCurve';
 import { PositionsTable } from './PositionsTable';
@@ -12,21 +12,24 @@ export function Dashboard() {
   const [history, setHistory] = useState<DailySnapshot[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [config, setConfig] = useState<StrategyConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [s, h, t, m] = await Promise.all([
+      const [s, h, t, m, c] = await Promise.all([
         dashboardApi.getStatus(),
         dashboardApi.getHistory(),
         dashboardApi.getTrades(),
         dashboardApi.getMetrics(),
+        dashboardApi.getConfig(),
       ]);
       setStatus(s);
       setHistory(h);
       setTrades(t);
       setMetrics(m);
+      setConfig(c);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch data');
@@ -88,11 +91,28 @@ export function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">
-            {status?.nav_updated_at
-              ? `NAV: ${new Date(status.nav_updated_at).toLocaleTimeString()}`
-              : `Last rebalance: ${status?.last_rebalance || 'Never'}`}
-          </span>
+          <div className="text-xs text-gray-500 text-right leading-relaxed">
+            <div>
+              Last rebalance: <span className="text-gray-300 font-mono">{status?.last_rebalance || 'Never'}</span>
+              {status?.last_rebalance_at && (
+                <span className="text-gray-600">
+                  {' '}({new Date(status.last_rebalance_at).toUTCString().slice(17, 22)} UTC)
+                </span>
+              )}
+            </div>
+            <div>
+              {config && (
+                <span className="text-gray-600">
+                  Next: daily {String(config.rebalance_hour_utc).padStart(2, '0')}:05 UTC
+                </span>
+              )}
+              {status?.nav_updated_at && (
+                <span className="text-gray-600">
+                  {' · '}NAV {new Date(status.nav_updated_at).toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          </div>
           <button
             onClick={handleRebalance}
             className="px-3 py-1.5 text-sm bg-[#00d4ff]/10 border border-[#00d4ff]/30 text-[#00d4ff] rounded hover:bg-[#00d4ff]/20 transition"

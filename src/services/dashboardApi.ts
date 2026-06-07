@@ -21,6 +21,7 @@ export interface StrategyStatus {
   leverage: number;
   positions: Position[];
   last_rebalance: string | null;
+  last_rebalance_at?: string | null;
   running_days: number;
   nav_updated_at: string | null;
 }

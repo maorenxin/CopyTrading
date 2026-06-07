@@ -34,8 +34,9 @@ def load_daily_closes() -> pd.DataFrame:
     return closes
 
 
-def compute_momentum_signal(closes: pd.DataFrame, window: int = None) -> pd.Series:
-    """Compute today's momentum signal scores for all coins.
+def compute_momentum_signal(closes: pd.DataFrame, window: int = None,
+                            as_of_date: str = None) -> pd.Series:
+    """Compute momentum signal scores as of a given date (default: latest row).
 
     Returns a Series indexed by coin with scores in [0, 1].
     Higher score = worse relative momentum = better short candidate.
@@ -43,12 +44,13 @@ def compute_momentum_signal(closes: pd.DataFrame, window: int = None) -> pd.Seri
     if window is None:
         window = config.MOMENTUM_WINDOW
 
+    closes = _slice(closes, as_of_date)
     rets = closes.pct_change(window, fill_method=None)
     btc_rets = rets["BTC"]
     coins = [c for c in closes.columns if c not in config.EXCLUDE_COINS]
     relative = rets[coins].sub(btc_rets, axis=0)
 
-    # Take latest row
+    # Take the row at as_of_date (or the latest available)
     latest = relative.iloc[-1].dropna()
     if len(latest) < config.N_LONG + config.N_SHORT:
         raise RuntimeError(f"Only {len(latest)} coins have valid signal, need {config.N_LONG + config.N_SHORT}")
@@ -70,6 +72,32 @@ def select_portfolio(scores: pd.Series) -> tuple[list[str], list[str]]:
     return short_coins, long_coins
 
 
-def get_latest_prices(closes: pd.DataFrame) -> pd.Series:
-    """Get the most recent price for each coin."""
-    return closes.iloc[-1].dropna()
+def get_latest_prices(closes: pd.DataFrame, as_of_date: str = None) -> pd.Series:
+    """Get the close price for each coin as of a given date (default: latest)."""
+    return _slice(closes, as_of_date).iloc[-1].dropna()
+
+
+def get_daily_return(closes: pd.DataFrame, coin: str, as_of_date: str = None) -> float:
+    """Single-day return for a coin as of a given date (close-to-close)."""
+    if coin not in closes.columns:
+        return 0.0
+    s = _slice(closes, as_of_date)[coin].dropna()
+    if len(s) >= 2:
+        return (s.iloc[-1] - s.iloc[-2]) / s.iloc[-2]
+    return 0.0
+
+
+def available_dates(closes: pd.DataFrame, after: str = None) -> list[str]:
+    """Trading dates present in the data, ascending. If `after` is given,
+    only dates strictly later than it are returned (used for backfill)."""
+    dates = [d.strftime("%Y-%m-%d") for d in closes.index]
+    if after:
+        dates = [d for d in dates if d > after]
+    return dates
+
+
+def _slice(closes: pd.DataFrame, as_of_date: str = None) -> pd.DataFrame:
+    """Restrict closes to rows up to and including as_of_date."""
+    if as_of_date is None:
+        return closes
+    return closes.loc[:as_of_date]

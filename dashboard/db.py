@@ -29,7 +29,8 @@ def init_db():
             n_longs INTEGER NOT NULL,
             n_shorts INTEGER NOT NULL,
             fees REAL NOT NULL,
-            mode TEXT NOT NULL
+            mode TEXT NOT NULL,
+            rebalanced_at TEXT
         );
 
         CREATE TABLE IF NOT EXISTS nav_ticks (
@@ -72,6 +73,13 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);
         CREATE INDEX IF NOT EXISTS idx_signals_date ON daily_signals(date);
     """)
+
+    # Migrate existing DBs that predate the rebalanced_at column.
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(daily_snapshots)").fetchall()}
+    if "rebalanced_at" not in cols:
+        conn.execute("ALTER TABLE daily_snapshots ADD COLUMN rebalanced_at TEXT")
+        conn.commit()
+
     conn.close()
 
 

@@ -49,6 +49,8 @@ def reschedule(hour: int):
 def _daily_rebalance(engine: PaperEngine):
     """Scheduled rebalance task."""
     try:
+        # Catch up any days missed while the process was down, then run today.
+        engine.backfill()
         result = engine.rebalance()
         logger.info(f"Rebalance complete: {result}")
     except Exception as e:
