@@ -195,11 +195,24 @@ class PaperEngine:
             if existing:
                 return {"status": "skipped", "reason": f"Already rebalanced on {today}"}
 
-            # Load prices and compute signal as of `today`
+            # Signal (coin selection) is always daily-frequency momentum.
             closes = signal.load_daily_closes()
             scores = signal.compute_momentum_signal(closes, as_of_date=today)
             short_coins, long_coins = signal.select_portfolio(scores)
-            prices = signal.get_latest_prices(closes, as_of_date=today)
+
+            # Price source depends on the path:
+            #   - live rebalance (force_date is None): real-time HL mark price, so
+            #     settling old positions and opening new ones use the SAME price the
+            #     intraday floating PnL is computed from (no split, no double-count).
+            #   - backfill (force_date set): that day's daily close — the only price
+            #     available for a historical day.
+            is_live = force_date is None
+            if is_live:
+                prices = fetch_mark_prices()
+                if not prices:
+                    return {"status": "error", "reason": "无法获取 mark price，已跳过 rebalance"}
+            else:
+                prices = signal.get_latest_prices(closes, as_of_date=today).to_dict()
 
             # Get previous equity
             prev_snapshot = db.get_latest_snapshot(conn)
@@ -213,12 +226,19 @@ class PaperEngine:
             if peak_row and peak_row["peak"]:
                 peak_equity = max(peak_equity, peak_row["peak"])
 
-            # Calculate PnL from previous positions using `today`'s close-to-close return
+            # Settle previous positions into realized PnL.
+            #   - live: float-to-realized using current mark vs entry price
+            #   - backfill: that day's close-to-close return
             prev_positions = db.get_current_positions(conn)
             daily_pnl = 0.0
             for pos in prev_positions:
-                ret = signal.get_daily_return(closes, pos["coin"], as_of_date=today)
-                daily_pnl += pos["notional"] * ret
+                if is_live:
+                    mark = prices.get(pos["coin"])
+                    if mark and pos["entry_price"] > 0:
+                        daily_pnl += pos["notional"] * (mark / pos["entry_price"] - 1)
+                else:
+                    ret = signal.get_daily_return(closes, pos["coin"], as_of_date=today)
+                    daily_pnl += pos["notional"] * ret
 
             equity += daily_pnl
 

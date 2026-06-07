@@ -7,6 +7,16 @@ import { SignalRankings } from './SignalRankings';
 import { TradeLog } from './TradeLog';
 import { ConfigPanel } from './ConfigPanel';
 
+/** Format an ISO timestamp as Beijing time (UTC+8) HH:MM. */
+function fmtBeijingTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 export function Dashboard() {
   const [status, setStatus] = useState<StrategyStatus | null>(null);
   const [history, setHistory] = useState<DailySnapshot[]>([]);
@@ -96,19 +106,19 @@ export function Dashboard() {
               Last rebalance: <span className="text-gray-300 font-mono">{status?.last_rebalance || 'Never'}</span>
               {status?.last_rebalance_at && (
                 <span className="text-gray-600">
-                  {' '}({new Date(status.last_rebalance_at).toUTCString().slice(17, 22)} UTC)
+                  {' '}({fmtBeijingTime(status.last_rebalance_at)})
                 </span>
               )}
             </div>
             <div>
               {config && (
                 <span className="text-gray-600">
-                  Next: daily {String(config.rebalance_hour_utc).padStart(2, '0')}:05 UTC
+                  Next: daily {String((config.rebalance_hour_utc + 8) % 24).padStart(2, '0')}:05 北京
                 </span>
               )}
               {status?.nav_updated_at && (
                 <span className="text-gray-600">
-                  {' · '}NAV {new Date(status.nav_updated_at).toLocaleTimeString()}
+                  {' · '}NAV {fmtBeijingTime(status.nav_updated_at)}
                 </span>
               )}
             </div>
