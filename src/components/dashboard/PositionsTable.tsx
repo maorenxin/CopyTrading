@@ -1,4 +1,8 @@
+import { HelpCircle } from 'lucide-react';
 import { Position } from '../../services/dashboardApi';
+
+const MARK_TOOLTIP =
+  'Mark = Hyperliquid 永续盘口中间价 (allMids 接口, (最优买价+最优卖价)/2)，后台每 5 分钟刷新一次。用于计算实时浮动盈亏，也是换仓时结算与新仓建仓的价源。';
 
 interface Props {
   positions: Position[];
@@ -37,7 +41,18 @@ export function PositionsTable({ positions }: Props) {
                 <th className="text-left py-2 px-2">Side</th>
                 <th className="text-right py-2 px-2">Notional</th>
                 <th className="text-right py-2 px-2">Entry</th>
-                <th className="text-right py-2 px-2">Mark</th>
+                <th className="text-right py-2 px-2">
+                  <span className="inline-flex items-center gap-1 justify-end">
+                    Mark
+                    <HelpCircle
+                      size={12}
+                      className="text-gray-600 hover:text-[#00d4ff] cursor-help"
+                      aria-label={MARK_TOOLTIP}
+                    >
+                      <title>{MARK_TOOLTIP}</title>
+                    </HelpCircle>
+                  </span>
+                </th>
                 <th className="text-right py-2 px-2">PnL</th>
               </tr>
             </thead>
